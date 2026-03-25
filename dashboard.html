@@ -1,0 +1,1071 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tickets · Panel de Trazabilidad</title>
+  <meta name="description" content="Dashboard de trazabilidad completa del ciclo de vida de tickets empresariales." />
+  <meta name="theme-color" content="#020617" />
+
+  <!-- Google Fonts: Inter + JetBrains Mono (same as fermentación) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
+
+  <style>
+    /* ============================================================
+       DESIGN SYSTEM — Aligned with Fermentación Dashboard
+       Deep Navy + Vivid Cyan · Glass Cards · Inter Font
+       ============================================================ */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      /* Brand (Fermentación identical) */
+      --brand: #06f9f9;
+      --brand-dark: #05d6d6;
+      --brand-rgb: 6, 249, 249;
+      --text-on-brand: #0f2323;
+
+      /* Surfaces — Deep Navy */
+      --bg-body: #020617;
+      --bg-card: rgba(255,255,255,0.03);
+      --bg-card-hover: rgba(255,255,255,0.05);
+      --bg-input: rgba(255,255,255,0.05);
+
+      /* Borders */
+      --border: rgba(255,255,255,0.1);
+      --border-glow: rgba(var(--brand-rgb), 0.3);
+
+      /* Text */
+      --text-primary: #f1f5f9;
+      --text-secondary: #cbd5e1;
+      --text-muted: #64748b;
+
+      /* Semantic */
+      --success: #22c55e;
+      --warning: #fbbf24;
+      --danger: #f43f5e;
+      --info: #3b82f6;
+      --purple: #8b5cf6;
+
+      /* Ticket States */
+      --recibido: #3b82f6;
+      --escalado: #f59e0b;
+      --resuelto: #8b5cf6;
+      --cerrado: #22c55e;
+      --critica: #f43f5e;
+      --simple: #22c55e;
+
+      /* Radius / Shadows */
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --radius-xl: 20px;
+      --shadow-glass: 0 8px 32px rgba(0,0,0,0.37);
+      --shadow-glow: 0 0 20px rgba(var(--brand-rgb), 0.2);
+      --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --mono: 'JetBrains Mono', 'Fira Code', monospace;
+    }
+
+    html, body {
+      min-height: 100%;
+      font-family: var(--font);
+      font-size: 14px;
+      background-color: var(--bg-body);
+      background-image:
+        radial-gradient(at 0% 0%, rgba(6,249,249,0.12) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(79,70,229,0.08) 0px, transparent 50%),
+        radial-gradient(at 50% 0%, rgba(6,249,249,0.04) 0px, transparent 60%);
+      background-attachment: fixed;
+      color: var(--text-primary);
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    ::selection { background: rgba(6,249,249,0.3); color: #fff; }
+
+    html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; }
+    html, body { scrollbar-width: none; }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 32px 24px 48px;
+    }
+
+    /* ── HEADER ── */
+    .page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-glass);
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .header-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius-md);
+      background: rgba(var(--brand-rgb), 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .header-icon .material-icons {
+      font-size: 24px;
+      color: var(--brand);
+    }
+
+    .header-title {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      color: var(--text-primary);
+    }
+
+    .header-title span { color: var(--brand); }
+
+    .header-subtitle {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 500;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .live-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 14px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      background: rgba(34,197,94,0.1);
+      color: var(--success);
+    }
+
+    .live-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      animation: livePulse 2s ease-in-out infinite;
+    }
+
+    @keyframes livePulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.5); }
+      50% { box-shadow: 0 0 0 6px rgba(34,197,94,0); }
+    }
+
+    .timestamp {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* ── CONFIG BAR ── */
+    .config-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 20px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-glass);
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .config-bar label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      white-space: nowrap;
+    }
+
+    .config-bar input[type="text"] {
+      flex: 1;
+      min-width: 240px;
+      padding: 10px 16px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: var(--bg-input);
+      color: var(--text-primary);
+      font-family: var(--mono);
+      font-size: 12px;
+      transition: all 0.2s ease;
+    }
+
+    .config-bar input[type="text"]:focus {
+      outline: none;
+      border-color: var(--brand);
+      box-shadow: 0 0 0 1px var(--brand);
+      background: rgba(255,255,255,0.1);
+    }
+
+    .config-bar input[type="text"]::placeholder { color: var(--text-muted); }
+
+    .btn-neon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 22px;
+      background: var(--brand);
+      color: var(--text-on-brand);
+      font-weight: 700;
+      font-size: 12px;
+      border-radius: var(--radius-xl);
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      font-family: var(--font);
+    }
+
+    .btn-neon:hover {
+      transform: translateY(-2px) scale(1.03);
+      box-shadow: var(--shadow-glow);
+    }
+
+    .btn-neon:active { transform: translateY(0) scale(0.97); }
+    .btn-neon:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .status-msg {
+      font-family: var(--mono);
+      font-size: 11px;
+      margin-left: auto;
+      font-weight: 500;
+    }
+
+    .status-msg.ok { color: var(--success); }
+    .status-msg.err { color: var(--danger); }
+    .status-msg.loading { color: var(--warning); }
+
+    /* ── STATS GRID — Metric Cards (Fermentación style) ── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .stat-card {
+      position: relative;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: 16px 18px;
+      transition: all 0.2s ease;
+      overflow: hidden;
+      box-shadow: var(--shadow-glass);
+    }
+
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+      background: var(--card-accent, var(--brand));
+    }
+
+    .stat-card:hover {
+      background: var(--bg-card-hover);
+      box-shadow: 0 0 15px rgba(var(--brand-rgb), 0.15);
+      transform: translateY(-2px);
+    }
+
+    .stat-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .stat-card-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .stat-card-icon {
+      width: 32px; height: 32px;
+      border-radius: var(--radius-sm);
+      background: rgba(var(--brand-rgb), 0.06);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .stat-card-icon .material-icons {
+      font-size: 18px;
+      color: var(--card-accent, var(--brand));
+    }
+
+    .stat-value {
+      font-family: var(--mono);
+      font-size: 32px;
+      font-weight: 800;
+      line-height: 1;
+      color: var(--text-primary);
+    }
+
+    /* ── FILTERS BAR ── */
+    .filters-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 20px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-glass);
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .filter-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-right: 4px;
+    }
+
+    .filter-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      font-family: var(--font);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .filter-btn:hover {
+      background: rgba(255,255,255,0.1);
+      border-color: var(--brand);
+      color: var(--brand);
+      transform: translateY(-1px);
+    }
+
+    .filter-btn.active {
+      background: rgba(var(--brand-rgb), 0.12);
+      border-color: var(--brand);
+      color: var(--brand);
+    }
+
+    .search-input {
+      margin-left: auto;
+      padding: 8px 16px 8px 40px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      background: var(--bg-input);
+      color: var(--text-primary);
+      font-family: var(--font);
+      font-size: 13px;
+      width: 240px;
+      transition: all 0.2s ease;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: 14px center;
+    }
+
+    .search-input:focus {
+      outline: none;
+      border-color: var(--brand);
+      box-shadow: 0 0 0 1px var(--brand);
+      background-color: rgba(255,255,255,0.1);
+    }
+
+    .search-input::placeholder { color: var(--text-muted); }
+
+    /* ── TABLE (Fermentación data-table style) ── */
+    .table-wrapper {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      box-shadow: var(--shadow-glass);
+    }
+
+    .table-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .table-toolbar-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .table-toolbar-title .material-icons {
+      font-size: 18px;
+      color: var(--brand);
+    }
+
+    .table-count {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--brand);
+      font-weight: 600;
+    }
+
+    table { width: 100%; border-collapse: separate; border-spacing: 0; }
+
+    thead th {
+      background: rgba(var(--brand-rgb), 0.04);
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+    }
+
+    tbody td {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-primary);
+      font-size: 13px;
+    }
+
+    tbody tr:hover td { background: rgba(var(--brand-rgb), 0.04); }
+    tbody tr:last-child td { border-bottom: none; }
+
+    .td-mono {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .td-email {
+      font-size: 12px;
+      max-width: 180px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .td-subject {
+      max-width: 220px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* ── BADGES (Fermentación style) ── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
+
+    .badge-dot { width: 6px; height: 6px; border-radius: 50%; }
+
+    .badge-recibido { background: rgba(59,130,246,0.1); color: var(--recibido); }
+    .badge-escalado { background: rgba(245,158,11,0.1); color: var(--escalado); }
+    .badge-resuelto { background: rgba(139,92,246,0.1); color: var(--resuelto); }
+    .badge-cerrado  { background: rgba(34,197,94,0.1); color: var(--cerrado); }
+    .badge-critica  { background: rgba(244,63,94,0.1); color: var(--critica); }
+    .badge-simple   { background: rgba(34,197,94,0.1); color: var(--simple); }
+    .badge-negativo_fuerte { background: rgba(244,63,94,0.1); color: var(--critica); }
+    .badge-negativo_leve   { background: rgba(245,158,11,0.1); color: var(--escalado); }
+    .badge-neutro    { background: rgba(100,116,139,0.1); color: var(--text-muted); }
+    .badge-positivo  { background: rgba(34,197,94,0.1); color: var(--success); }
+    .badge-alta      { background: rgba(244,63,94,0.1); color: var(--danger); }
+    .badge-baja      { background: rgba(34,197,94,0.1); color: var(--success); }
+    .badge-accent    { background: rgba(var(--brand-rgb), 0.1); color: var(--brand); }
+
+    .expand-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 5px 12px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .expand-btn:hover {
+      border-color: var(--brand);
+      color: var(--brand);
+      background: rgba(var(--brand-rgb), 0.06);
+    }
+
+    /* ── HISTORIAL TIMELINE ── */
+    .historial-row td { padding: 0; }
+
+    .historial-panel {
+      display: none;
+      background: rgba(2,6,23,0.6);
+      border-top: 1px solid var(--border);
+      padding: 20px 24px;
+    }
+
+    .historial-panel.open { display: block; animation: fadeIn 0.3s ease; }
+
+    .historial-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--brand);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 16px;
+    }
+
+    .historial-title .material-icons { font-size: 16px; }
+
+    .timeline {
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      padding-left: 24px;
+    }
+
+    .timeline::before {
+      content: '';
+      position: absolute;
+      left: 7px;
+      top: 8px;
+      bottom: 8px;
+      width: 2px;
+      background: linear-gradient(180deg, var(--brand), rgba(var(--brand-rgb), 0.1));
+      border-radius: 2px;
+    }
+
+    .timeline-item {
+      display: flex;
+      gap: 16px;
+      padding: 10px 0;
+      position: relative;
+    }
+
+    .timeline-dot {
+      position: absolute;
+      left: -20px;
+      top: 16px;
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      border: 2px solid var(--bg-body);
+      box-shadow: 0 0 0 2px rgba(var(--brand-rgb), 0.2);
+    }
+
+    .timeline-content { flex: 1; min-width: 0; }
+
+    .timeline-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+      flex-wrap: wrap;
+    }
+
+    .timeline-fecha {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    .timeline-accion {
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+
+    /* ── EMPTY / LOADING ── */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 60px 20px;
+      min-height: 200px;
+    }
+
+    .empty-state .material-icons {
+      font-size: 56px;
+      color: var(--text-muted);
+      opacity: 0.3;
+      margin-bottom: 16px;
+      animation: float 3s ease-in-out infinite;
+    }
+
+    .empty-state p {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      letter-spacing: 1px;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Staggered stat entry */
+    .stat-card { animation: fadeIn 0.35s ease-out both; }
+    .stat-card:nth-child(1) { animation-delay: 0.05s; }
+    .stat-card:nth-child(2) { animation-delay: 0.10s; }
+    .stat-card:nth-child(3) { animation-delay: 0.15s; }
+    .stat-card:nth-child(4) { animation-delay: 0.20s; }
+    .stat-card:nth-child(5) { animation-delay: 0.25s; }
+    .stat-card:nth-child(6) { animation-delay: 0.30s; }
+    .stat-card:nth-child(7) { animation-delay: 0.35s; }
+    .stat-card:nth-child(8) { animation-delay: 0.40s; }
+
+    .table-wrapper { animation: fadeIn 0.4s ease-out 0.3s both; }
+
+    /* Glow divider */
+    .glow-divider {
+      border: none;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--brand), transparent);
+      opacity: 0.2;
+      margin: 0;
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 1024px) {
+      .stats-grid { grid-template-columns: repeat(4, 1fr); }
+    }
+
+    @media (max-width: 768px) {
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .col-hide-mobile { display: none; }
+      .page-header { flex-direction: column; align-items: flex-start; }
+      .header-right { align-self: flex-end; }
+      .config-bar { flex-direction: column; align-items: stretch; }
+      .config-bar input[type="text"] { min-width: unset; }
+      .filters-bar { gap: 6px; }
+      .search-input { width: 100%; margin-left: 0; margin-top: 4px; }
+      .stat-value { font-size: 24px; }
+    }
+
+    @media (max-width: 480px) {
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .container { padding: 16px 12px 32px; }
+      thead th, tbody td { padding: 10px 8px; font-size: 11px; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ═══ HEADER ═══ -->
+  <div class="page-header">
+    <div class="header-brand">
+      <div class="header-icon">
+        <span class="material-icons">confirmation_number</span>
+      </div>
+      <div>
+        <div class="header-title">Panel de <span>Tickets</span></div>
+        <div class="header-subtitle">Trazabilidad completa del ciclo de vida</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="live-badge">
+        <span class="live-dot"></span>
+        Visualizador
+      </div>
+      <div class="timestamp" id="ts"></div>
+    </div>
+  </div>
+
+  <!-- ═══ CONFIG: URL ═══ -->
+  <div class="config-bar">
+    <label>
+      <span class="material-icons" style="font-size:16px;vertical-align:middle;margin-right:4px;color:var(--brand)">link</span>
+      API URL
+    </label>
+    <input type="text" id="apiUrl"
+      value="https://n8n-carlos-proyecto.eastus2.cloudapp.azure.com/webhook/tickets-api"
+      placeholder="https://tu-dominio/webhook/tickets-api" />
+    <button class="btn-neon" id="btnLoad" onclick="loadData()">
+      <span class="material-icons" style="font-size:16px">download</span>
+      Cargar datos
+    </button>
+    <span class="status-msg" id="statusMsg"></span>
+  </div>
+
+  <!-- ═══ STATS ═══ -->
+  <div class="stats-grid" id="statsGrid">
+    <div class="stat-card" style="--card-accent: var(--brand)">
+      <div class="stat-card-header">
+        <span class="stat-card-label">Total Tickets</span>
+        <div class="stat-card-icon"><span class="material-icons">inbox</span></div>
+      </div>
+      <div class="stat-value" id="s-total">—</div>
+    </div>
+    <div class="stat-card" style="--card-accent: var(--recibido)">
+      <div class="stat-card-header">
+        <span class="stat-card-label">Recibidos</span>
+        <div class="stat-card-icon"><span class="material-icons" style="color:var(--recibido)">mark_email_unread</span></div>
+      </div>
+      <div class="stat-value" id="s-recibidos">—</div>
+    </div>
+    <div class="stat-card" style="--card-accent: var(--escalado)">
+      <div class="stat-card-header">
+        <span class="stat-card-label">Escalados</span>
+        <div class="stat-card-icon"><span class="material-icons" style="color:var(--escalado)">escalator_warning</span></div>
+      </div>
+      <div class="stat-value" id="s-escalados">—</div>
+    </div>
+    <div class="stat-card" style="--card-accent: var(--resuelto)">
+      <div class="stat-card-header">
+        <span class="stat-card-label">Resueltos Auto</span>
+        <div class="stat-card-icon"><span class="material-icons" style="color:var(--resuelto)">auto_fix_high</span></div>
+      </div>
+      <div class="stat-value" id="s-resueltos_auto">—</div>
+    </div>
+    <div class="stat-card" style="--card-accent: var(--cerrado)">
+      <div class="stat-card-header">
+        <span class="stat-card-label">Cerrados</span>
+        <div class="stat-card-icon"><span class="material-icons" style="color:var(--cerrado)">check_circle</span></div>
+      </div>
+      <div class="stat-value" id="s-cerrados_humano">—</div>
+    </div>
+    <div class="stat-card" style="--card-accent: var(--critica)">
+      <div class="stat-card-header">
+        <span class="stat-card-label">Críticos</span>
+        <div class="stat-card-icon"><span class="material-icons" style="color:var(--critica)">warning</span></div>
+      </div>
+      <div class="stat-value" id="s-criticos">—</div>
+    </div>
+    <div class="stat-card" style="--card-accent: var(--simple)">
+      <div class="stat-card-header">
+        <span class="stat-card-label">Simples</span>
+        <div class="stat-card-icon"><span class="material-icons" style="color:var(--simple)">check</span></div>
+      </div>
+      <div class="stat-value" id="s-simples">—</div>
+    </div>
+    <div class="stat-card" style="--card-accent: var(--warning)">
+      <div class="stat-card-header">
+        <span class="stat-card-label">Últimos 7 días</span>
+        <div class="stat-card-icon"><span class="material-icons" style="color:var(--warning)">date_range</span></div>
+      </div>
+      <div class="stat-value" id="s-ultimos_7_dias">—</div>
+    </div>
+  </div>
+
+  <!-- ═══ FILTERS ═══ -->
+  <div class="filters-bar">
+    <span class="filter-label">Filtrar</span>
+    <button class="filter-btn active" onclick="setFilter('todos', this)">Todos</button>
+    <button class="filter-btn" onclick="setFilter('Recibido', this)">
+      <span class="badge-dot" style="background:var(--recibido)"></span> Recibido
+    </button>
+    <button class="filter-btn" onclick="setFilter('Escalado a humano', this)">
+      <span class="badge-dot" style="background:var(--escalado)"></span> Escalado
+    </button>
+    <button class="filter-btn" onclick="setFilter('Resuelto automáticamente', this)">
+      <span class="badge-dot" style="background:var(--resuelto)"></span> Resuelto Auto
+    </button>
+    <button class="filter-btn" onclick="setFilter('Cerrado por humano', this)">
+      <span class="badge-dot" style="background:var(--cerrado)"></span> Cerrado
+    </button>
+    <input class="search-input" type="text" placeholder="Buscar email, asunto, ticket..." oninput="setSearch(this.value)" />
+  </div>
+
+  <!-- ═══ TABLE ═══ -->
+  <div class="table-wrapper">
+    <div class="table-toolbar">
+      <div class="table-toolbar-title">
+        <span class="material-icons">list_alt</span>
+        Tickets Registrados — Ciclo de Vida
+      </div>
+      <span class="table-count" id="ticketCount"></span>
+    </div>
+    <hr class="glow-divider" />
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Email</th>
+          <th>Asunto</th>
+          <th>Categoría</th>
+          <th class="col-hide-mobile">Sentimiento</th>
+          <th class="col-hide-mobile">Complejidad</th>
+          <th>Estado</th>
+          <th>Recibido</th>
+          <th>Historial</th>
+        </tr>
+      </thead>
+      <tbody id="ticketBody">
+        <tr>
+          <td colspan="9">
+            <div class="empty-state">
+              <span class="material-icons">cloud_download</span>
+              <p>PRESIONA "CARGAR DATOS" PARA CONSULTAR LA API</p>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<script>
+  // ===== STATE =====
+  let rawTickets = [];
+  let stats = {};
+  let currentFilter = 'todos';
+  let currentSearch = '';
+  let openRows = new Set();
+
+  document.getElementById('ts').textContent = new Date().toLocaleString('es-CO', {
+    timeZone: 'America/Bogota', dateStyle: 'medium', timeStyle: 'short'
+  });
+
+  // ===== LOAD DATA =====
+  async function loadData() {
+    const url = document.getElementById('apiUrl').value.trim();
+    if (!url) { showStatus('Ingresa la URL del webhook', 'err'); return; }
+
+    const btn = document.getElementById('btnLoad');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-icons" style="font-size:16px;animation:spin 0.8s linear infinite">sync</span> Cargando...';
+    showStatus('Conectando…', 'loading');
+
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
+      const data = await resp.json();
+
+      if (data.stats && data.tickets) {
+        stats = data.stats;
+        rawTickets = data.tickets;
+      } else if (Array.isArray(data)) {
+        rawTickets = data;
+        stats = {};
+      } else {
+        stats = data.stats || {};
+        rawTickets = data.tickets || [];
+      }
+
+      renderStats();
+      render();
+      showStatus(`✓ ${rawTickets.length} tickets cargados`, 'ok');
+      document.getElementById('ts').textContent = new Date().toLocaleString('es-CO', {
+        timeZone: 'America/Bogota', dateStyle: 'medium', timeStyle: 'short'
+      });
+    } catch (err) {
+      showStatus(`Error: ${err.message}`, 'err');
+      console.error('Error cargando datos:', err);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<span class="material-icons" style="font-size:16px">download</span> Cargar datos';
+    }
+  }
+
+  function showStatus(msg, type) {
+    const el = document.getElementById('statusMsg');
+    el.textContent = msg;
+    el.className = 'status-msg ' + type;
+  }
+
+  // ===== STATS =====
+  function renderStats() {
+    ['total','recibidos','escalados','resueltos_auto','cerrados_humano','criticos','simples','ultimos_7_dias'].forEach(k => {
+      const el = document.getElementById('s-' + k);
+      if (el) {
+        const val = stats[k] ?? 0;
+        el.textContent = val;
+        // Animate number
+        el.style.animation = 'none';
+        el.offsetHeight; // trigger reflow
+        el.style.animation = 'fadeIn 0.3s ease';
+      }
+    });
+  }
+
+  // ===== BADGES =====
+  function estadoBadge(estado) {
+    const map = { 'Recibido':'recibido', 'Escalado a humano':'escalado', 'Resuelto automáticamente':'resuelto', 'Cerrado por humano':'cerrado' };
+    const cls = map[estado] || 'recibido';
+    return `<span class="badge badge-${cls}"><span class="badge-dot" style="background:currentColor"></span>${estado || '—'}</span>`;
+  }
+
+  function categoriaBadge(cat) {
+    if (!cat) return '<span class="badge badge-neutro">—</span>';
+    return `<span class="badge badge-${cat.toLowerCase()}">${cat}</span>`;
+  }
+
+  function sentimientoBadge(s) {
+    if (!s) return '<span class="badge badge-neutro">—</span>';
+    return `<span class="badge badge-${s.toLowerCase()}">${s.replace(/_/g, ' ')}</span>`;
+  }
+
+  function complejidadBadge(c) {
+    if (!c) return '<span class="badge badge-neutro">—</span>';
+    return `<span class="badge badge-${c.toLowerCase()}">${c}</span>`;
+  }
+
+  function estadoColor(estado) {
+    return { 'Recibido':'#3b82f6', 'Escalado a humano':'#f59e0b', 'Resuelto automáticamente':'#8b5cf6', 'Cerrado por humano':'#22c55e', 'Analizado por IA':'#a78bfa' }[estado] || '#06f9f9';
+  }
+
+  function shortId(id) { return id ? id.substring(0, 8) + '…' : '—'; }
+
+  function esc(str) {
+    if (!str) return '';
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ===== RENDER TABLE =====
+  function render() {
+    const filtered = rawTickets.filter(t => {
+      const matchFilter = currentFilter === 'todos' || t.estado === currentFilter;
+      const q = currentSearch.toLowerCase();
+      const matchSearch = !q || (t.email||'').toLowerCase().includes(q) || (t.subject||'').toLowerCase().includes(q) || (t.ticket_id||'').toLowerCase().includes(q);
+      return matchFilter && matchSearch;
+    });
+
+    document.getElementById('ticketCount').textContent = filtered.length + ' registros';
+    const tbody = document.getElementById('ticketBody');
+    tbody.innerHTML = '';
+
+    if (!filtered.length) {
+      tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><span class="material-icons">inbox</span><p>NO HAY TICKETS QUE MOSTRAR</p></div></td></tr>`;
+      return;
+    }
+
+    filtered.forEach(t => {
+      const rowId = 'h-' + (t.ticket_id || Math.random());
+      const hist = t.historial || [];
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="td-mono" title="${esc(t.ticket_id)}">${shortId(t.ticket_id)}</td>
+        <td class="td-email" title="${esc(t.email)}">${esc(t.email) || '—'}</td>
+        <td class="td-subject" title="${esc(t.subject)}">${esc(t.subject) || '—'}</td>
+        <td>${categoriaBadge(t.categoria)}</td>
+        <td class="col-hide-mobile">${sentimientoBadge(t.sentimiento)}</td>
+        <td class="col-hide-mobile">${complejidadBadge(t.complejidad)}</td>
+        <td>${estadoBadge(t.estado)}</td>
+        <td class="td-mono">${t.received_at || '—'}</td>
+        <td><button class="expand-btn" onclick="toggleHistorial('${rowId}',this)"><span class="material-icons" style="font-size:14px">timeline</span> ${hist.length} <span style="font-size:10px">▾</span></button></td>
+      `;
+      tbody.appendChild(tr);
+
+      // Historial
+      const htr = document.createElement('tr');
+      htr.className = 'historial-row';
+      htr.id = rowId;
+
+      let tl = '';
+      hist.forEach(h => {
+        const c = estadoColor(h.estado);
+        tl += `<div class="timeline-item">
+          <div class="timeline-dot" style="background:${c}"></div>
+          <div class="timeline-content">
+            <div class="timeline-header">
+              <span class="badge" style="background:${c}18;color:${c}">${esc(h.estado)}</span>
+              <span class="timeline-fecha">${esc(h.fecha)}</span>
+            </div>
+            <div class="timeline-accion">${esc(h.accion||'').replace(/\n/g,'<br/>')}</div>
+          </div>
+        </div>`;
+      });
+
+      htr.innerHTML = `<td colspan="9"><div class="historial-panel" id="panel-${rowId}">
+        <div class="historial-title"><span class="material-icons">timeline</span> Ciclo de vida — ${esc(t.ticket_id)}</div>
+        <div class="timeline">${tl || '<p style="color:var(--text-muted);font-size:12px">Sin historial registrado</p>'}</div>
+      </div></td>`;
+      tbody.appendChild(htr);
+
+      if (openRows.has(rowId)) document.getElementById('panel-' + rowId)?.classList.add('open');
+    });
+  }
+
+  function toggleHistorial(rowId, btn) {
+    const panel = document.getElementById('panel-' + rowId);
+    if (!panel) return;
+    const isOpen = panel.classList.toggle('open');
+    if (isOpen) openRows.add(rowId); else openRows.delete(rowId);
+  }
+
+  function setFilter(f, btn) {
+    currentFilter = f;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    render();
+  }
+
+  function setSearch(v) { currentSearch = v; render(); }
+
+  document.getElementById('apiUrl').addEventListener('keydown', e => { if (e.key === 'Enter') loadData(); });
+</script>
+</body>
+</html>

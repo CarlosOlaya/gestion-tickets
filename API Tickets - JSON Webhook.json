@@ -1,0 +1,190 @@
+{
+  "name": "API Tickets - JSON Webhook",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "tickets-api",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -240,
+        0
+      ],
+      "id": "a1b2c3d4-1111-4444-aaaa-000000000001",
+      "name": "GET /tickets-api",
+      "webhookId": "tickets-api-001"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  t.ticket_id,\n  t.email,\n  t.subject,\n  t.message,\n  t.categoria,\n  t.sentimiento,\n  t.complejidad,\n  t.lenguaje_agresivo,\n  t.estado,\n  TO_CHAR(t.received_at AT TIME ZONE 'America/Bogota', 'DD/MM/YYYY HH12:MI AM') AS received_at,\n  TO_CHAR(t.created_at AT TIME ZONE 'America/Bogota', 'DD/MM/YYYY HH12:MI AM') AS created_at,\n  TO_CHAR(t.updated_at AT TIME ZONE 'America/Bogota', 'DD/MM/YYYY HH12:MI AM') AS updated_at,\n  (\n    SELECT json_agg(\n      json_build_object(\n        'estado', h.estado,\n        'accion', h.accion,\n        'fecha', TO_CHAR(h.fecha AT TIME ZONE 'America/Bogota', 'DD/MM/YYYY HH12:MI AM')\n      ) ORDER BY h.fecha ASC\n    )\n    FROM ticket_historial h\n    WHERE h.ticket_id = t.ticket_id\n  ) AS historial\nFROM tickets t\nORDER BY t.created_at DESC\nLIMIT 200;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        -80
+      ],
+      "id": "a1b2c3d4-2222-4444-aaaa-000000000002",
+      "name": "Consultar tickets con historial",
+      "credentials": {
+        "postgres": {
+          "id": "1VN5Z881WTWHWpNJ",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  COUNT(*) FILTER (WHERE estado = 'Recibido') AS recibidos,\n  COUNT(*) FILTER (WHERE estado = 'Escalado a humano') AS escalados,\n  COUNT(*) FILTER (WHERE estado = 'Resuelto automáticamente') AS resueltos_auto,\n  COUNT(*) FILTER (WHERE estado = 'Cerrado por humano') AS cerrados_humano,\n  COUNT(*) AS total,\n  COUNT(*) FILTER (WHERE categoria = 'CRITICA') AS criticos,\n  COUNT(*) FILTER (WHERE categoria = 'SIMPLE') AS simples,\n  COUNT(*) FILTER (WHERE received_at >= NOW() - INTERVAL '7 days') AS ultimos_7_dias\nFROM tickets;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        120
+      ],
+      "id": "a1b2c3d4-3333-4444-aaaa-000000000003",
+      "name": "Consultar estadísticas",
+      "credentials": {
+        "postgres": {
+          "id": "1VN5Z881WTWHWpNJ",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        240,
+        0
+      ],
+      "id": "a1b2c3d4-4444-4444-aaaa-000000000004",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\n// Items from merge: first batch = tickets, after that = stats\nconst allData = items.map(i => i.json);\n\n// Find stats item (has 'total' key)\nconst statsItem = allData.find(d => d.total !== undefined) || {};\n\n// Tickets are all items that are NOT the stats\nconst tickets = allData.filter(d => d.ticket_id !== undefined);\n\nreturn [{\n  json: {\n    stats: {\n      total: parseInt(statsItem.total) || 0,\n      recibidos: parseInt(statsItem.recibidos) || 0,\n      escalados: parseInt(statsItem.escalados) || 0,\n      resueltos_auto: parseInt(statsItem.resueltos_auto) || 0,\n      cerrados_humano: parseInt(statsItem.cerrados_humano) || 0,\n      criticos: parseInt(statsItem.criticos) || 0,\n      simples: parseInt(statsItem.simples) || 0,\n      ultimos_7_dias: parseInt(statsItem.ultimos_7_dias) || 0\n    },\n    tickets: tickets.map(t => ({\n      ticket_id: t.ticket_id,\n      email: t.email,\n      subject: t.subject,\n      categoria: t.categoria,\n      sentimiento: t.sentimiento,\n      complejidad: t.complejidad,\n      lenguaje_agresivo: t.lenguaje_agresivo,\n      estado: t.estado,\n      received_at: t.received_at,\n      created_at: t.created_at,\n      updated_at: t.updated_at,\n      historial: t.historial || []\n    })),\n    generated_at: new Date().toISOString()\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        0
+      ],
+      "id": "a1b2c3d4-5555-4444-aaaa-000000000005",
+      "name": "Armar JSON response"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              },
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        680,
+        0
+      ],
+      "id": "a1b2c3d4-6666-4444-aaaa-000000000006",
+      "name": "Responder JSON"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "GET /tickets-api": {
+      "main": [
+        [
+          {
+            "node": "Consultar tickets con historial",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Consultar estadísticas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar tickets con historial": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar estadísticas": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Armar JSON response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Armar JSON response": {
+      "main": [
+        [
+          {
+            "node": "Responder JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "api-json-v1",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7b5e15642fc6df8fea8e9e9c2a94862c2fd3c80d9dd1d13174882035ce3d598a"
+  },
+  "tags": []
+}

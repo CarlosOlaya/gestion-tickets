@@ -1,0 +1,4 @@
+n8n-carlos-proyecto.eastus2.cloudapp.azure.com {
+    reverse_proxy n8n:5678
+}
+

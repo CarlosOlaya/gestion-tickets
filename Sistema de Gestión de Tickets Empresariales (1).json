@@ -1,0 +1,2081 @@
+{
+  "name": "Sistema de Gestión de Tickets Empresariales",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 🗄️ REGISTRO EN BASE DE DATOS y respuesta\nCrea ticket con estado 'Recibido' y responder al cliente\n",
+        "height": 288,
+        "width": 388,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -5456,
+        -176
+      ],
+      "id": "60ea4898-87b9-4e0b-89dc-d39cafdcbdcb",
+      "name": "Nota DB"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={\n  \"email_id\": \"{{ $('Trigger correo del cliente').item.json.id }}\",\n  \"thread_id\": \"{{$('Trigger correo del cliente').item.json.threadId}}\",\n  \"email\": \"{{ $('Trigger correo del cliente').item.json.from.value[0].address }}\",\n  \"subject\": \"{{ $('Trigger correo del cliente').item.json.headers.subject }}\",\n  \"message\": \"{{ $('Trigger correo del cliente').item.json.text.split('\\n-- \\n')[0].trim() }}\",\n\"received_at\": \"{{ $json.internalDate ? DateTime.fromMillis(parseInt($json.internalDate)).setZone('America/Bogota').toISO() : $now.setZone('America/Bogota').toISO() }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -5648,
+        48
+      ],
+      "id": "f185b45f-b2c1-4fcc-9b50-1b45a455e644",
+      "name": "Convertir variables de interes"
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {
+          "readStatus": "unread"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1,
+      "position": [
+        -6240,
+        64
+      ],
+      "id": "40086725-3e24-4663-a9b1-5d1279b5d0e4",
+      "name": "Trigger correo del cliente",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "sbZKxNnR3hca3lIR",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"categoria\": {\n      \"type\": \"string\",\n      \"enum\": [\"CRITICA\", \"SIMPLE\"]\n    },\n    \"sentimiento\": {\n      \"type\": \"string\",\n      \"enum\": [\"POSITIVO\", \"NEUTRO\", \"NEGATIVO_LEVE\", \"NEGATIVO_FUERTE\"]\n    },\n    \"complejidad\": {\n      \"type\": \"string\",\n      \"enum\": [\"ALTA\", \"BAJA\"]\n    },\n    \"lenguaje_agresivo\": {\n      \"type\": \"boolean\"\n    }\n  }\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        -5312,
+        336
+      ],
+      "id": "4422f718-e5c8-4ad7-93a0-ac4710f4e861",
+      "name": "Resultado limpio y directo"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Analiza este mensaje de un cliente.\n\nAsunto: {{ $json.subject }}\nMensaje: {{ $json.message }}\n\nResponde con exactamente este JSON:\n{\n  \"categoria\": \"CRITICA\" o \"SIMPLE\",\n  \"sentimiento\": \"POSITIVO\" o \"NEUTRO\" o \"NEGATIVO_LEVE\" o \"NEGATIVO_FUERTE\",\n  \"complejidad\": \"ALTA\" o \"BAJA\",\n  \"lenguaje_agresivo\": true o false\n}\n\nReglas de clasificación:\n- CRITICA: reclamo legal, reembolso, cancelación de contrato, problemas de pago, amenaza directa.\n- SIMPLE: consulta de horarios, estado de pedido, información general, cambio de contraseña, información básica de servicios.\n- NEGATIVO_FUERTE: insultos, amenazas, lenguaje agresivo o extremadamente frustrado.\n- ALTA complejidad: mensaje supera 500 palabras o involucra múltiples problemas simultáneos.\n- lenguaje_agresivo true: si contiene groserías, insultos o amenazas explícitas.",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "Eres un clasificador de tickets de soporte empresarial. Responde ÚNICAMENTE con JSON válido, sin markdown ni explicaciones."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -5456,
+        160
+      ],
+      "id": "2c16d0a0-f631-4a53-978e-0b9565f576cb",
+      "name": "Analizar el contenido del mensaje",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -4976,
+        48
+      ],
+      "id": "05d7d973-6141-4a5c-a331-2f064f69b9ae",
+      "name": "Espera y une"
+    },
+    {
+      "parameters": {
+        "fieldsToAggregate": {
+          "fieldToAggregate": [
+            {
+              "fieldToAggregate": "output.categoria"
+            },
+            {
+              "fieldToAggregate": "output.sentimiento"
+            },
+            {
+              "fieldToAggregate": "output.complejidad"
+            },
+            {
+              "fieldToAggregate": "output.lenguaje_agresivo"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        -4816,
+        48
+      ],
+      "id": "a14739e9-2a9d-4150-91d2-f080b35c696b",
+      "name": "Agrupar datos"
+    },
+    {
+      "parameters": {
+        "resource": "thread",
+        "operation": "reply",
+        "threadId": "={{ $json.thread_id }}",
+        "messageId": "={{ $json.email_id }}",
+        "emailType": "html",
+        "message": "=<p>Estimado/a <b>{{ $json.email }}</b>,</p>\n\n<p>Hemos recibido su mensaje correctamente y ha sido registrado en nuestro sistema de soporte.</p>\n\n<ul>\n  <li><b>Ticket:</b> {{ $json.ticket_id }}</li>\n  <li><b>Asunto:</b> {{ $json.subject }}</li>\n  <li><b>Fecha de recepción:</b> {{ DateTime.fromISO($('Convertir variables de interes').item.json.received_at).setZone('America/Bogota').toFormat('dd/MM/yyyy hh:mm a') }}\n </li>\n</ul>\n\n<p>Un miembro de nuestro equipo revisará su caso y le responderá a la brevedad posible.</p>\n\n<p>Cordialmente,<br><b>Equipo de Soporte</b></p>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -5232,
+        -64
+      ],
+      "id": "c601d051-b2b5-4440-9385-bc7996ff936c",
+      "name": "Enviar confirmación de recepción",
+      "webhookId": "f0d5f748-7ace-4060-8dc1-e95434c7ad6e",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "LyOvX5HscQtiKSDF",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "value": "public",
+          "mode": "list",
+          "cachedResultName": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tickets",
+          "mode": "list",
+          "cachedResultName": "tickets"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "lenguaje_agresivo": false,
+            "email_id": "={{ $json.email_id }}",
+            "thread_id": "={{ $json.thread_id }}",
+            "email": "={{ $json.email }}",
+            "subject": "={{ $json.subject }}",
+            "message": "={{ $json.message }}",
+            "received_at": "={{ $json.received_at }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "ticket_id",
+              "displayName": "ticket_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "email_id",
+              "displayName": "email_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "thread_id",
+              "displayName": "thread_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "subject",
+              "displayName": "subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "message",
+              "displayName": "message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "received_at",
+              "displayName": "received_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "categoria",
+              "displayName": "categoria",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "sentimiento",
+              "displayName": "sentimiento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "complejidad",
+              "displayName": "complejidad",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "lenguaje_agresivo",
+              "displayName": "lenguaje_agresivo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "updated_at",
+              "displayName": "updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -5392,
+        -64
+      ],
+      "id": "63df4914-23c2-4c89-abfb-e06662797c45",
+      "name": "Crear ticket en BD (Estado: Recibido)",
+      "credentials": {
+        "postgres": {
+          "id": "1VN5Z881WTWHWpNJ",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "schema": {
+          "__rl": true,
+          "value": "public",
+          "mode": "list",
+          "cachedResultName": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tickets",
+          "mode": "list",
+          "cachedResultName": "tickets"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "lenguaje_agresivo": "={{ $('Analizar el contenido del mensaje').item.json.output.lenguaje_agresivo }}",
+            "ticket_id": "={{ $('Crear ticket en BD (Estado: Recibido)').item.json.ticket_id }}",
+            "categoria": "={{ $('Analizar el contenido del mensaje').item.json.output.categoria }}",
+            "sentimiento": "={{ $('Analizar el contenido del mensaje').item.json.output.sentimiento }}",
+            "complejidad": "={{ $('Analizar el contenido del mensaje').item.json.output.complejidad }}"
+          },
+          "matchingColumns": [
+            "ticket_id"
+          ],
+          "schema": [
+            {
+              "id": "ticket_id",
+              "displayName": "ticket_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "email_id",
+              "displayName": "email_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "thread_id",
+              "displayName": "thread_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "subject",
+              "displayName": "subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "message",
+              "displayName": "message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "received_at",
+              "displayName": "received_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "categoria",
+              "displayName": "categoria",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "sentimiento",
+              "displayName": "sentimiento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "complejidad",
+              "displayName": "complejidad",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "lenguaje_agresivo",
+              "displayName": "lenguaje_agresivo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "updated_at",
+              "displayName": "updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -4624,
+        48
+      ],
+      "id": "ba14d81c-772d-48b9-8149-2fc24682fbe2",
+      "name": "Actualizar análisis IA",
+      "credentials": {
+        "postgres": {
+          "id": "1VN5Z881WTWHWpNJ",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "rule-critica",
+              "leftValue": "={{ $json.categoria }}",
+              "rightValue": "CRITICA",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "rule-sentimiento",
+              "leftValue": "={{ $('Actualizar análisis IA').item.json.sentimiento }}",
+              "rightValue": "NEGATIVO_FUERTE",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "rule-agresivo",
+              "leftValue": "={{ $('Actualizar análisis IA').item.json.lenguaje_agresivo }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            },
+            {
+              "id": "rule-complejidad",
+              "leftValue": "={{ $('Actualizar análisis IA').item.json.complejidad }}",
+              "rightValue": "ALTA",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "rule-repetidos",
+              "leftValue": "={{ $json.total }}",
+              "rightValue": 2,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -4208,
+        48
+      ],
+      "id": "22791fe5-f9d0-4271-b1d5-a004759b3d87",
+      "name": "¿Requiere escalamiento?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-lenguaje",
+              "leftValue": "={{ $('Analizar el contenido del mensaje').item.json.output.lenguaje_agresivo}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            },
+            {
+              "id": "f96937c6-c23c-4b3d-81ee-9c9ebe888af0",
+              "leftValue": "= {{ $('Analizar el contenido del mensaje').item.json.output.sentimiento}}",
+              "rightValue": "NEGATIVO_FUERTE",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -3776,
+        32
+      ],
+      "id": "65805871-0ea6-4d8a-9888-2ba8dae25097",
+      "name": "¿Departamento de Atención o Jurídica?"
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "value": "public",
+          "mode": "list"
+        },
+        "table": {
+          "__rl": true,
+          "value": "ticket_historial",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ticket_id": "={{ $('Actualizar análisis IA').item.json.ticket_id }}",
+            "accion": "=Escalado a Atención al Usuario. \nRazón: Lenguaje negativo/agresivo detectado.\nSentimiento: {{ $('Actualizar análisis IA').item.json.sentimiento }}.\nLenguaje agresivo: {{ $('Actualizar análisis IA').item.json.lenguaje_agresivo }}",
+            "estado": "Escalado a humano"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "ticket_id",
+              "displayName": "ticket_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "accion",
+              "displayName": "accion",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fecha",
+              "displayName": "fecha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -3536,
+        -128
+      ],
+      "id": "be76b115-5e1a-42c9-9de8-3df3dbf767c7",
+      "name": "Historial: Escalado Atención a usuario",
+      "credentials": {
+        "postgres": {
+          "id": "1VN5Z881WTWHWpNJ",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "olayacarlosolaya66@gmail.com",
+        "subject": "=ESCALADO Ticket #{{ $json.ticket_id }}-Lenguaje negativo detectado",
+        "message": "=<h2> Ticket escalado al Departamento de Atención al Usuario</h2>\n<p><strong>Motivo de escalamiento:</strong> Sentimiento negativo fuerte o lenguaje agresivo detectado</p>\n<hr>\n<h3>Datos del ticket:</h3>\n<ul>\n  <li><strong>Ticket ID:</strong> {{ $json.ticket_id }}</li>\n  <li><strong>Cliente:</strong> {{ $('Convertir variables de interes').item.json.email }}</li>\n  <li><strong>Asunto: {{ $('Convertir variables de interes').item.json.subject }}</strong></li>\n  <li><strong>Categoría: {{ $('Actualizar análisis IA').item.json.categoria }}</strong> </li>\n  <li><strong>Sentimiento detectado:</strong> {{ $('Actualizar análisis IA').item.json.sentimiento }}</li>\n  <li><strong>Lenguaje agresivo:</strong> {{ $('Actualizar análisis IA').item.json.lenguaje_agresivo }}</li>\n</ul>\n<h3>Mensaje original del cliente:</h3>\n<blockquote style='background:#fff3cd;padding:15px;border-left:4px solid #ffc107;'>\n{{ $('Convertir variables de interes').item.json.message }}\n</blockquote>\n<hr>\n<p><em>Este mensaje fue generado automáticamente por el Sistema de Gestión de Tickets.</em></p>\n<p><strong>Para cerrar el ticket, responda este correo con la resolución del caso.</strong></p>",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -3328,
+        -128
+      ],
+      "id": "bd88e8ca-81ba-4e87-841f-0aac05a57943",
+      "name": "Reenviar a Atención al Usuario",
+      "webhookId": "f7f43bd6-cd35-4d80-977b-fca419ed2bdf",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "LyOvX5HscQtiKSDF",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "value": "public",
+          "mode": "list"
+        },
+        "table": {
+          "__rl": true,
+          "value": "ticket_historial",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ticket_id": "={{ $('Actualizar análisis IA').item.json.ticket_id }}",
+            "accion": "=Escalado a Asesoría Jurídica. \nRazón: {{ $('Analizar el contenido del mensaje').item.json.output.categoria === 'CRITICA' ? 'Categoría crítica' : '' }}{{ $('Analizar el contenido del mensaje').item.json.output.complejidad === 'ALTA' ? ', Alta complejidad' : '' }}{{ parseInt($('Verificar tickets repetidos').item.json.total) > 2 ? ', Más de 2 tickets repetidos en 7 días' : '' }}.\nCategoría: {{ $('Actualizar análisis IA').item.json.categoria }}",
+            "estado": "Escalado a humano"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "ticket_id",
+              "displayName": "ticket_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "accion",
+              "displayName": "accion",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fecha",
+              "displayName": "fecha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -3536,
+        48
+      ],
+      "id": "10bc0440-e11d-4dae-bfda-05c83911ae15",
+      "name": "Historial: Escalado Asesoria juridica",
+      "credentials": {
+        "postgres": {
+          "id": "1VN5Z881WTWHWpNJ",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "value": "public",
+          "mode": "list"
+        },
+        "table": {
+          "__rl": true,
+          "value": "ticket_historial",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ticket_id": "={{ $('Actualizar análisis IA').item.json.ticket_id }}",
+            "accion": "=Caso resuelto automáticamente.\nCategoría: {{ $('Actualizar análisis IA').item.json.categoria }}.\nComplejidad: {{ $('Actualizar análisis IA').item.json.complejidad }}",
+            "estado": "Resuelto automáticamente"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "ticket_id",
+              "displayName": "ticket_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "accion",
+              "displayName": "accion",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fecha",
+              "displayName": "fecha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -4000,
+        320
+      ],
+      "id": "58799c78-c565-460a-80bf-34687b47dfa9",
+      "name": "Historial: Resuelto automáticamente",
+      "credentials": {
+        "postgres": {
+          "id": "1VN5Z881WTWHWpNJ",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "olayacarlosolaya65@gmail.com",
+        "subject": "=ESCALADO Ticket #{{ $json.ticket_id }} - Caso crítico: {{ $('Actualizar análisis IA').item.json.categoria }}",
+        "message": "=<h2>Ticket escalado a Asesoría Jurídica</h2>\n<p><strong>Motivo de escalamiento:</strong> Categoría crítica, alta complejidad o solicitudes repetidas en los últimos 7 días</p>\n<hr>\n<h3>Datos del ticket:</h3>\n<ul>\n  <li><strong>Ticket ID:</strong>{{ $json.ticket_id }} </li>\n  <li><strong>Cliente:</strong> {{ $('Convertir variables de interes').item.json.email }}</li>\n  <li><strong>Asunto:</strong> {{ $('Convertir variables de interes').item.json.subject }}</li>\n  <li><strong>Categoría:</strong> {{ $('Actualizar análisis IA').item.json.categoria }}</li>\n  <li><strong>Complejidad:</strong> {{ $('Actualizar análisis IA').item.json.complejidad }}</li>\n  <li><strong>Tickets repetidos (últimos 7 días):</strong> {{ $('Verificar tickets repetidos').item.json.total }}</li>\n</ul>\n<h3>Mensaje original del cliente:</h3>\n<blockquote style='background:#f8d7da;padding:15px;border-left:4px solid #dc3545;'>\n{{ $('Convertir variables de interes').item.json.message }}\n</blockquote>\n<hr>\n<p><em>Este mensaje fue generado automáticamente por el Sistema de Gestión de Tickets.</em></p>\n<p><strong>Para cerrar el ticket, responda este correo con la resolución del caso.</strong></p>",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -3328,
+        48
+      ],
+      "id": "b0549af1-b3ce-4b48-9786-564e4dd0709e",
+      "name": "Reenviar a Asesoria juridica",
+      "webhookId": "f7f43bd6-cd35-4d80-977b-fca419ed2bdf",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "LyOvX5HscQtiKSDF",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "thread",
+        "operation": "reply",
+        "threadId": "={{ $('Crear ticket en BD (Estado: Recibido)').item.json.thread_id }}",
+        "messageId": "={{ $('Crear ticket en BD (Estado: Recibido)').item.json.email_id }}",
+        "emailType": "html",
+        "message": "=<h2>Su caso ha sido asignado a nuestro equipo especializado</h2>\n<p>Estimado/a <strong>{{ $('Convertir variables de interes').item.json.email }}</strong>,</p>\n<p>Hemos revisado su solicitud y debido a la naturaleza de su caso, ha sido asignado al área encargada para brindarle una atención personalizada.</p>\n<ul>\n  <li><strong>Ticket:</strong> {{ $('Crear ticket en BD (Estado: Recibido)').item.json.ticket_id }}</li>\n  <li><strong>Asunto:</strong> {{ $('Convertir variables de interes').item.json.subject }}</li>\n  <li><strong>Fecha:</strong> {{ DateTime.now().setZone('America/Bogota').toFormat('dd/MM/yyyy hh:mm a') }}</li>\n</ul>\n<p>Recibirá una respuesta a la brevedad posible.</p>\n<p>Lamentamos los inconvenientes ocasionados y agradecemos su paciencia.</p>\n<br>\n<p>Cordialmente,<br><strong>Equipo de Soporte</strong></p>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -3984,
+        32
+      ],
+      "id": "5479ff4c-52e4-43cd-bd13-0a45c2111806",
+      "name": "Enviar escalado humano",
+      "webhookId": "f7f43bd6-cd35-4d80-977b-fca419ed2bdf",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "LyOvX5HscQtiKSDF",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## SOLUCIÓN AUTOMATICA\nsolucion automatica registo historico y envio de respuesta",
+        "height": 272,
+        "width": 416
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -4032,
+        240
+      ],
+      "typeVersion": 1,
+      "id": "f78ee4b3-ec0f-40d8-b757-01c636ac3d79",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {
+          "sender": "=olayacarlosolaya65@gmail.com"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1,
+      "position": [
+        -3040,
+        48
+      ],
+      "id": "37fa53dd-b99c-4df7-83f8-786231bf44dd",
+      "name": "Trigger respuesta asesoria juridica",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "LyOvX5HscQtiKSDF",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {
+          "sender": "=olayacarlosolaya66@gmail.com"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1,
+      "position": [
+        -3040,
+        -128
+      ],
+      "id": "36d085fc-f61e-4a1a-a675-cbfa61055f45",
+      "name": "Trigger respuesta atencion usuario",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "LyOvX5HscQtiKSDF",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT email, thread_id, email_id \nFROM tickets \nWHERE ticket_id = '{{ $json.ticket_id }}'",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -2112,
+        -48
+      ],
+      "id": "5ae81e8e-faa8-4a3f-9745-65a5e3a0e6eb",
+      "name": "Obtener ticket original",
+      "credentials": {
+        "postgres": {
+          "id": "1VN5Z881WTWHWpNJ",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "value": "public",
+          "mode": "list"
+        },
+        "table": {
+          "__rl": true,
+          "value": "ticket_historial",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ticket_id": "={{ $('¿Es respuesta validad?').item.json.ticket_id }}",
+            "accion": "=Caso cerrado por el área responsable. \nSolucion:{{ $('¿Es respuesta validad?').item.json.resolution }}",
+            "estado": "Cerrado por humano"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "ticket_id",
+              "displayName": "ticket_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "accion",
+              "displayName": "accion",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fecha",
+              "displayName": "fecha",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -1888,
+        -48
+      ],
+      "id": "4a8e3471-2443-4768-9e4a-7d5460c281f1",
+      "name": "Historial: Cerrado por humano",
+      "credentials": {
+        "postgres": {
+          "id": "1VN5Z881WTWHWpNJ",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "thread",
+        "operation": "reply",
+        "threadId": "={{ $('Obtener ticket original').item.json.thread_id }}",
+        "messageId": "={{ $('Obtener ticket original').item.json.email_id }}",
+        "emailType": "html",
+        "message": "=<h2>Su caso ha sido cerrado</h2>\n<p>Estimado/a <strong>{{ $('Obtener ticket original').item.json.email }}</strong>,</p>\n<p>Nos complace informarle que su caso ha sido atendido y cerrado por nuestro equipo especializado.</p>\n<ul>\n  <li><strong>Ticket:{{ $('¿Es respuesta validad?').item.json.ticket_id }}</strong></li>\n  <li><strong>Resolución:</strong> {{ $('¿Es respuesta validad?').item.json.resolution }}</li>\n</ul>\n<p>Si necesita asistencia adicional, por favor abra un nuevo correo con su consulta.</p>\n<br>\n<p>Cordialmente,<br><strong>Equipo de Soporte</strong></p>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -1696,
+        -48
+      ],
+      "id": "c127c308-12c1-4166-8b6b-cd96f73f5f1f",
+      "name": "Notificar cierre humano al cliente",
+      "webhookId": "c7e38124-64f3-4198-8846-b5455ff5ad6b",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "LyOvX5HscQtiKSDF",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "thread",
+        "operation": "reply",
+        "threadId": "={{ $('Convertir variables de interes').item.json.thread_id }}",
+        "messageId": "={{ $('Convertir variables de interes').item.json.email_id }}",
+        "emailType": "html",
+        "message": "=<h2>Su solicitud ha sido resuelta</h2>\n<p>Estimado/a <strong>{{ $('Convertir variables de interes').item.json.email }}</strong>,</p>\n<p>Nos complace informarle que su caso ha sido resuelto exitosamente:</p>\n<ul>\n  <li><strong>Ticket:</strong> {{ $('Crear ticket en BD (Estado: Recibido)').item.json.ticket_id }}</li>\n  <li><strong>Asunto:</strong> {{ $('Convertir variables de interes').item.json.subject }}</li>\n  <li><strong>Categoría:</strong> {{ $('Actualizar análisis IA').item.json.categoria }}</li>\n</ul>\n<p>Si tiene alguna duda adicional, por favor abra un \n<strong>nuevo correo</strong> con su consulta.</p>\n<br>\n<p>Cordialmente,<br><strong>Equipo de Soporte</strong></p>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -3776,
+        320
+      ],
+      "id": "c432c526-6236-4829-a329-124411a87eaa",
+      "name": "Notificar resuelto automatico al cliente",
+      "webhookId": "f7f43bd6-cd35-4d80-977b-fca419ed2bdf",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "LyOvX5HscQtiKSDF",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Trigger respuesta de las areas encargadas\nrespuestas y extraccion de informacion de interes\n",
+        "height": 448,
+        "width": 916,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -3136,
+        -224
+      ],
+      "typeVersion": 1,
+      "id": "375af4e2-9aba-42ea-bec6-dfc2eb6ab610",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## Seleccion de departamento, trabilidad  y reenvio\nse asigna el departamento encargado, se guarda su historial y reenvia ticket para solucion\n ",
+        "height": 448,
+        "width": 688,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -3840,
+        -224
+      ],
+      "typeVersion": 1,
+      "id": "0f120283-0ca3-4470-8f38-34f28205c4e8",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "## Trazabilidad y envio de respuesta\nSe guarda el historial del ticket y se responde para mantener la trazabilidad",
+        "height": 448,
+        "width": 688,
+        "color": 2
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -2192,
+        -224
+      ],
+      "typeVersion": 1,
+      "id": "16a3c1cb-ee03-4d32-ac44-8b512eed37ff",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "operation": "markAsRead",
+        "messageId": "={{ $json.id }}"
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        -6048,
+        64
+      ],
+      "id": "6490693e-8243-4699-ba1b-cc5264654d41",
+      "name": "Marcar como leído",
+      "webhookId": "dee95b78-dada-4e7a-956e-0eb793ae620d",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "sbZKxNnR3hca3lIR",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "d9cbd4c5-33d2-46f6-8c76-3f729ca39281",
+              "leftValue": "={{ $('Trigger correo del cliente').item.json.From }}",
+              "rightValue": "olayacarlosolaya66@gmail.com",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -5856,
+        64
+      ],
+      "id": "e0a1bd1f-2587-4764-bc14-26e6deef0c03",
+      "name": "Evitar Loop"
+    },
+    {
+      "parameters": {
+        "operation": "markAsRead",
+        "messageId": "={{ $json.id }}"
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        -2832,
+        48
+      ],
+      "id": "e5bbed10-f514-4874-9766-23ddfad099e9",
+      "name": "Marcar como leído asesoria juridica",
+      "webhookId": "dee95b78-dada-4e7a-956e-0eb793ae620d",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "LyOvX5HscQtiKSDF",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "markAsRead",
+        "messageId": "={{ $json.id }}"
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        -2832,
+        -128
+      ],
+      "id": "eecd0660-c695-4332-9975-19e094d8fb9f",
+      "name": "Marcar como leído atencion cliente",
+      "webhookId": "dee95b78-dada-4e7a-956e-0eb793ae620d",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "LyOvX5HscQtiKSDF",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "0df5f594-d049-4c90-9353-9742775c7dde",
+              "leftValue": "={{ $json.ticket_id }}",
+              "rightValue": "Ticket #",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": "={{ false }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -2368,
+        -32
+      ],
+      "id": "b46b508d-9e15-4739-a203-7be3e49fc783",
+      "name": "¿Es respuesta validad?"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "633f4afa-db7f-441c-bfeb-06c12e0e8c82",
+              "name": "=ticket_id",
+              "value": "={{ $('Trigger respuesta atencion usuario').item.json.subject.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)?.[0] ?? '' }}",
+              "type": "string"
+            },
+            {
+              "id": "5c4fa4d3-5de0-49f6-ace1-ab1f5323f8ad",
+              "name": "thread_id",
+              "value": "={{ $json.threadId }}",
+              "type": "string"
+            },
+            {
+              "id": "814e5808-b85e-4773-8aaf-c4d56fe4a111",
+              "name": "email_id",
+              "value": "={{ $('Trigger respuesta atencion usuario').item.json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "645f2d4e-e180-45cc-8b61-39013abcc9bf",
+              "name": "respondent",
+              "value": "={{ $('Trigger respuesta atencion usuario').item.json.from.value[0].address }}",
+              "type": "string"
+            },
+            {
+              "id": "791d15cc-4e6b-4df5-90ea-c82aa1ae3d61",
+              "name": "resolution",
+              "value": "={{ $('Trigger respuesta atencion usuario').item.json.text.split('\\nOn ')[0].split('\\nEl ')[0].trim() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -2576,
+        -128
+      ],
+      "id": "4249ac42-6f21-4aac-90a0-a8d182631d8e",
+      "name": "Extraer datos de atencion al usuario"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "633f4afa-db7f-441c-bfeb-06c12e0e8c82",
+              "name": "=ticket_id",
+              "value": "={{ $('Trigger respuesta asesoria juridica').item.json.subject.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)?.[0] ?? '' }}",
+              "type": "string"
+            },
+            {
+              "id": "814e5808-b85e-4773-8aaf-c4d56fe4a111",
+              "name": "email_id",
+              "value": "={{ $('Trigger respuesta asesoria juridica').item.json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "791d15cc-4e6b-4df5-90ea-c82aa1ae3d61",
+              "name": "resolution",
+              "value": "={{ $('Trigger respuesta asesoria juridica').item.json.text.split('\\nOn ')[0].split('\\nEl ')[0].trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "f888a07c-8636-432f-9387-bca273bfef29",
+              "name": "thread_id",
+              "value": "={{ $json.threadId }}",
+              "type": "string"
+            },
+            {
+              "id": "a63a15cf-e487-4943-a236-2f44b1f2b332",
+              "name": "respondent",
+              "value": "={{ $('Trigger respuesta asesoria juridica').item.json.from.value[0].address }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -2576,
+        48
+      ],
+      "id": "aff3f660-084b-4419-8e7e-edf715323cf8",
+      "name": "Extraer datos de asesoria juridica"
+    },
+    {
+      "parameters": {
+        "model": "llama-3.3-70b-versatile",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -5456,
+        352
+      ],
+      "id": "3f729e26-ea07-4d3d-91e0-e2de856fc611",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "ozUI3QieLHWQk8Gj",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "39e7d450-9bc7-45c7-9232-af7fd12a143c",
+              "leftValue": "={{ $json.output }}",
+              "rightValue": "",
+              "operator": {
+                "type": "object",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -5184,
+        160
+      ],
+      "id": "8255d182-6a3f-4c48-8961-7d671387cad5",
+      "name": "¿IA respondió correctamente?"
+    },
+    {
+      "parameters": {
+        "sendTo": "carlos.olaya@cecar.edu.co",
+        "subject": "⚠️ Error IA - Ticket no procesado",
+        "message": "=<p>El sistema no pudo procesar automáticamente el siguiente correo:</p>\n<ul>\n  <li><b>De:</b> {{ $('Convertir variables de interes').item.json.email }}</li>\n  <li><b>Asunto:</b> {{ $('Convertir variables de interes').item.json.subject }}</li>\n  <li><b>Fecha:</b> {{ DateTime.fromISO($('Convertir variables de interes').item.json.received_at).setZone('America/Bogota').toFormat('dd/MM/yyyy hh:mm a') }}</li>\n</ul>\n<p>Por favor atiéndelo manualmente.</p>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        -4976,
+        288
+      ],
+      "id": "8c0bc462-f8b1-46ee-a487-606e523b9a7d",
+      "name": "Notificación si IA falla",
+      "webhookId": "06ca2c50-4fb3-4004-818b-30db4731a84f",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "LyOvX5HscQtiKSDF",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "v_tickets_7dias",
+          "mode": "list",
+          "cachedResultName": "v_tickets_7dias"
+        },
+        "returnAll": true,
+        "where": {
+          "values": [
+            {
+              "column": "email",
+              "value": "={{ $json.email }}"
+            },
+            {
+              "column": "categoria",
+              "value": "={{ $json.categoria }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -4432,
+        48
+      ],
+      "id": "78de5836-cf94-42a5-a52b-37154424869a",
+      "name": "Verificar tickets repetidos",
+      "credentials": {
+        "postgres": {
+          "id": "1VN5Z881WTWHWpNJ",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## MOTOR DE REGLAS\nEvalúa si el ticket debe escalarse",
+        "height": 240,
+        "width": 256,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -4288,
+        -32
+      ],
+      "id": "33ffed7d-6429-488a-98ed-bae9babb3e69",
+      "name": "Nota Reglas"
+    }
+  ],
+  "pinData": {
+    "Trigger correo del cliente": [
+      {
+        "json": {
+          "id": "19d1e6a3df512590",
+          "threadId": "19d1e6a3df512590",
+          "labelIds": [
+            "UNREAD",
+            "IMPORTANT",
+            "CATEGORY_PERSONAL",
+            "INBOX"
+          ],
+          "sizeEstimate": 36162,
+          "headers": {
+            "delivered-to": "Delivered-To: tito1999.2009@gmail.com",
+            "received": "Received: from mail-sor-f41.google.com (mail-sor-f41.google.com. [209.85.220.41])\r\n        by mx.google.com with SMTPS id af79cd13be357-8cff5d46a88sor42232085a.5.2026.03.23.22.56.11\r\n        for <tito1999.2009@gmail.com>\r\n        (Google Transport Security);\r\n        Mon, 23 Mar 2026 22:56:11 -0700 (PDT)",
+            "x-received": "X-Received: by 2002:a05:622a:8359:b0:509:2231:977a with SMTP id\r\n d75a77b69052e-50b6eeb8f18mr26352271cf.30.1774331770915; Mon, 23 Mar 2026\r\n 22:56:10 -0700 (PDT)",
+            "arc-seal": "ARC-Seal: i=1; a=rsa-sha256; t=1774331771; cv=none;\r\n        d=google.com; s=arc-20240605;\r\n        b=QSbl2iwAdExm1JmOA2k/PtFwadFuMC656cR4LjwCGdY3CgYU+v5OJdoQzO7G+TZE/p\r\n         niKXxDqkivcm4tXSLhfwQz3mkENAg/+irQ39RF+61zpiK2MdfbZZXtEPQ6HVnJ4ySEne\r\n         IQJ2rnNGKF42R0TOnuSKOqsatJx3Y9+4OmiG4MYIm8XLzbhXAEET1rCcLV4AULWcCwhc\r\n         qjITq0uBeoYjCjbJqFQ9yDDZK7CV1ZO3eHgq/fnvW6vPx64dL9jeipi1UJdGq/DWY1g8\r\n         wubq9RrH9Af79FQySY/AKma8vLNcMPFoHETA0n9ihM3Pu5n1zcRn9F4JB06xcVGrb6YP\r\n         E47Q==",
+            "arc-message-signature": "ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20240605;\r\n        h=to:subject:message-id:date:from:mime-version:dkim-signature;\r\n        bh=CPqYQeqUJ/PlLte690UOhmJIzrAxxNz4Zlul/1Xu7rg=;\r\n        fh=tY2SVomv36z1hn4gMjfBNas+/XjyXi3laySGIINbv0g=;\r\n        b=l1sWdxGz+Mj+GALnMbIZK5GEzFhZJqKD8gGS9bajuONTJIyN8g5dm6T9lVQDuJ8cFx\r\n         Ej0CqKBNMSi/7xJupXqPTGSaD5c1iC1ywLx/OIGWkPN73kdX3vAELoPjlC+aG8sDrElD\r\n         MmgHrn2YLQ9OmFBOP79Xu3v5bxG47O4EuIXboA2fOZI2ZyOMPmIehzLZ9uOTmng6zaQ4\r\n         14pgtbW1Br1ueSA+gqV2RLHbdO2aICJQ5+cmgeGk6Ktd6B7XGphrWza1JwXbVmChiomb\r\n         Q1LG88C08uWRPgcYw0ShrBr1nVDP6vcGlG/jWisQIICOEb1OVW+u31rg+VQtD+N1LwYi\r\n         i7jw==;\r\n        dara=google.com",
+            "arc-authentication-results": "ARC-Authentication-Results: i=1; mx.google.com; arc=none",
+            "return-path": "Return-Path: <carlos.olaya@cecar.edu.co>",
+            "received-spf": "Received-SPF: pass (google.com: domain of carlos.olaya@cecar.edu.co designates 209.85.220.41 as permitted sender) client-ip=209.85.220.41;",
+            "authentication-results": "Authentication-Results: mx.google.com;\r\n       dkim=pass header.i=@cecar.edu.co header.s=google header.b=Ra6J3mI9;\r\n       arc=pass (i=1);\r\n       spf=pass (google.com: domain of carlos.olaya@cecar.edu.co designates 209.85.220.41 as permitted sender) smtp.mailfrom=carlos.olaya@cecar.edu.co;\r\n       dmarc=pass (p=NONE sp=NONE dis=NONE) header.from=cecar.edu.co;\r\n       dara=pass header.i=@gmail.com",
+            "dkim-signature": "DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;\r\n        d=cecar.edu.co; s=google; t=1774331771; x=1774936571; dara=google.com;\r\n        h=to:subject:message-id:date:from:mime-version:from:to:cc:subject\r\n         :date:message-id:reply-to;\r\n        bh=CPqYQeqUJ/PlLte690UOhmJIzrAxxNz4Zlul/1Xu7rg=;\r\n        b=Ra6J3mI92CDbLilKO9mY99YbSzM5eMuGywqaywfTyNHp45wpLKze/yFbnyYcP3UUcQ\r\n         72ZHLkDSygyaTp3XllXYCakBLanWl2xBTCrFhRkxp5APahaTZ4tjQA1wanNsRBCZtF4z\r\n         i+AT0T/mfpIVHSHpDJoRfZpDVzb/Gr0QbtJKC86KOfSF0kh7bBZQibcMMB4eiUoihWNV\r\n         ZNz6l1wSDdF5A536FrQBtgz+4FLvSDeVhpVS69WTem0Jgp9HJ6K5PhPM8yg6qVJyAcnt\r\n         r3WoEi1qVKo7z3/zgCTpCLmAGLFKQGDSHKXIs1AN89RPkKbepuJFwxKOTUQ0QKarsGzW\r\n         oq9A==",
+            "x-google-dkim-signature": "X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;\r\n        d=1e100.net; s=20251104; t=1774331771; x=1774936571;\r\n        h=to:subject:message-id:date:from:mime-version:x-gm-gg\r\n         :x-gm-message-state:from:to:cc:subject:date:message-id:reply-to;\r\n        bh=CPqYQeqUJ/PlLte690UOhmJIzrAxxNz4Zlul/1Xu7rg=;\r\n        b=tXw23Z+jKH2Cpqj8MPE8L8O1oGJU/CH4rmmnBCx0WaubkMvHJ8ex1x4soDcVhGwVwn\r\n         CoR6VgWPTmuzhbXaV6HqHpfyhDIPPSKmsAlXUzEzzb/rI6BHNjSPeKPdSMpbPJwOkHjJ\r\n         SiajmwJC6ZckNiHhWnmUGdRRKxN6/5H4scjZYsuH1QTu9UVeX0la8D8H+9+5wyPoCTqc\r\n         mCgKKmBMn7YheL1DPlH+trdYGeeLubPzZBwQlF1x4NE1mNF5gCyFY3BpRNHPIqUnNpXN\r\n         OgcJW8M/6ESAgHbktXYENxkLaB/8wYDNkwdAV3sjInLhfif3E4s2k0G3w6t2wq/H366r\r\n         ZnJw==",
+            "x-gm-message-state": "X-Gm-Message-State: AOJu0YzAcYLBuAiMVG8lLjLpRM55wacEf5xb2dCWN8opQG4rIeIDVQBS\r\n\tNlQ1RL26kUs9KjcE+zLRJkAtpK+qONZ0dwyn1x3E83NUHOJYOMQceZjcgD+InQH2r6eJ/PPwJta\r\n\tqIcbHcgX+L/37v+ahoRGMyQojLQNGcbEMJ4qtayCQMGGf7i7Sf96IRnFIzCCWo+AjRpmqx6fQ2E\r\n\tR8RbKu6YpciIJ2E+HSUItgiFnGnuC9XedjZbCyZB4=",
+            "x-gm-gg": "X-Gm-Gg: ATEYQzwZJubOBwMTOT9fJpxQ+2oigEAokG0+pHuG3DfVr90Bmk+MjNdUJyT5aHBBaX4\r\n\tso3qXI7s95ujkzq6PE0vU2whpM+SFAkK7k2WJcUx3K0drESqvMyPWUNHqICksWNZUu/VjYswVPi\r\n\t5DK/1g3WclaPtaGwokesXPNNBkcvhDh/cKdC8o5xQSNctIeRKgpe1G0bzEAkhmSj3eMeVEmWuv4\r\n\tUxoyTvW5a/5Bxhw7oc2mvTyi1pxwubeYITXYxJeBQZsCsw+y3V5WVXQb5+sEusI6cgCmX36JMyJ\r\n\ttJEVZqAZ+l7tNgCC15/qHpkl9nI5gyDsmruiNhgS+oHqOmw0Mg4e4ZZ3T10=",
+            "mime-version": "MIME-Version: 1.0",
+            "from": "From: CARLOS ENRIQUE OLAYA HERNANDEZ <carlos.olaya@cecar.edu.co>",
+            "date": "Date: Tue, 24 Mar 2026 00:55:57 -0500",
+            "x-gm-features": "X-Gm-Features: AaiRm53M0FY-Ykl22h9zdIbehED2YuFqwjwLYjHXXbwAo_hKc9_HU46yyRnHGrA",
+            "message-id": "Message-ID: <CA+=4OM7B2-KOCUheZmc=ORXSPveQ06UfjZ6eybL7zjptcPJ4yw@mail.gmail.com>",
+            "subject": "Subject: Consulta detallada sobre estado de mi pedido y condiciones del servicio",
+            "to": "To: tito1999.2009@gmail.com",
+            "content-type": "Content-Type: multipart/alternative; boundary=\"000000000000eb5c03064dbece1f\""
+          },
+          "html": "<div dir=\"ltr\"><div style=\"margin:0px;padding:0px;clear:both;overflow:visible;direction:ltr;color:rgb(0,0,0);font-family:&quot;Segoe UI&quot;,&quot;Segoe UI Web&quot;,Arial,Verdana,sans-serif;font-size:12px\"><p style=\"margin:0px;padding:0px;vertical-align:baseline;font-kerning:none;background-color:transparent;color:windowtext\"><span lang=\"ES-CO\" style=\"margin:0px;padding:0px;font-size:12pt;line-height:20.7px;font-family:&quot;Times New Roman&quot;,&quot;Times New Roman_EmbeddedFont&quot;,&quot;Times New Roman_MSFontService&quot;,serif;font-variant-ligatures:none\"><span style=\"margin:0px;padding:0px\">Estimado equipo de atención al cliente,</span></span><span style=\"margin:0px;padding:0px;font-size:12pt;line-height:20.7px;font-family:&quot;Times New Roman&quot;,&quot;Times New Roman_EmbeddedFont&quot;,&quot;Times New Roman_MSFontService&quot;,serif\"> </span></p></div><div style=\"margin:0px;padding:0px;clear:both;overflow:visible;direction:ltr;color:rgb(0,0,0);font-family:&quot;Segoe UI&quot;,&quot;Segoe UI Web&quot;,Arial,Verdana,sans-serif;font-size:12px\"><p style=\"margin:0px;padding:0px;vertical-align:baseline;font-kerning:none;background-color:transparent;color:windowtext\"><span lang=\"ES-CO\" style=\"margin:0px;padding:0px;font-size:12pt;line-height:20.7px;font-family:&quot;Times New Roman&quot;,&quot;Times New Roman_EmbeddedFont&quot;,&quot;Times New Roman_MSFontService&quot;,serif;font-variant-ligatures:none\"><span style=\"margin:0px;padding:0px\"> </span></span><span style=\"margin:0px;padding:0px;font-size:12pt;line-height:20.7px;font-family:&quot;Times New Roman&quot;,&quot;Times New Roman_EmbeddedFont&quot;,&quot;Times New Roman_MSFontService&quot;,serif\"> </span></p></div><div style=\"margin:0px;padding:0px;clear:both;overflow:visible;direction:ltr;color:rgb(0,0,0);font-family:&quot;Segoe UI&quot;,&quot;Segoe UI Web&quot;,Arial,Verdana,sans-serif;font-size:12px\"><p style=\"margin:0px;padding:0px;vertical-align:baseline;font-kerning:none;background-color:transparent;color:windowtext\"><span lang=\"ES-CO\" style=\"margin:0px;padding:0px;font-size:12pt;line-height:20.7px;font-family:&quot;Times New Roman&quot;,&quot;Times New Roman_EmbeddedFont&quot;,&quot;Times New Roman_MSFontService&quot;,serif;font-variant-ligatures:none\"><span style=\"margin:0px;padding:0px\">Me dirijo a ustedes con el fin de realizar una consulta detallada respecto al estado actual de mi pedido y algunas condiciones del servicio que considero importantes aclarar antes de tomar cualquier decisión al respecto.</span></span><span style=\"margin:0px;padding:0px;font-size:12pt;line-height:20.7px;font-family:&quot;Times New Roman&quot;,&quot;Times New Roman_EmbeddedFont&quot;,&quot;Times New Roman_MSFontService&quot;,serif\"> </span></p></div><div style=\"margin:0px;padding:0px;clear:both;overflow:visible;direction:ltr;color:rgb(0,0,0);font-family:&quot;Segoe UI&quot;,&quot;Segoe UI Web&quot;,Arial,Verdana,sans-serif;font-size:12px\"><p style=\"margin:0px;padding:0px;vertical-align:baseline;font-kerning:none;background-color:transparent;color:windowtext\"><span lang=\"ES-CO\" style=\"margin:0px;padding:0px;font-size:12pt;line-height:20.7px;font-family:&quot;Times New Roman&quot;,&quot;Times New Roman_EmbeddedFont&quot;,&quot;Times New Roman_MSFontService&quot;,serif;font-variant-ligatures:none\"><span style=\"margin:0px;padding:0px\"> </span></span><span style=\"margin:0px;padding:0px;font-size:12pt;line-height:20.7px;font-family:&quot;Times New Roman&quot;,&quot;Times New Roman_EmbeddedFont&quot;,&quot;Times New Roman_MSFontService&quot;,serif\"> </span></p></div><div style=\"margin:0px;padding:0px;clear:both;overflow:visible;direction:ltr;color:rgb(0,0,0);font-family:&quot;Segoe UI&quot;,&quot;Segoe UI Web&quot;,Arial,Verdana,sans-serif;font-size:12px\"><p style=\"margin:0px;padding:0px;vertical-align:baseline;font-kerning:none;background-color:transparent;color:windowtext\"><span lang=\"ES-CO\" style=\"margin:0px;padding:0px;font-size:12pt;line-height:20.7px;font-family:&quot;Times New Roman&quot;,&quot;Times New Roman_EmbeddedFont&quot;,&quot;Times New Roman_MSFontService&quot;,serif;font-variant-ligatures:none\"><span style=\"margin:0px;padding:0px\">En primer lugar, quisiera mencionar que realicé mi pedido hace aproximadamente tres semanas. Desde entonces no he recibido ninguna notificación formal sobre el avance del mismo, lo cual me genera cierta inquietud. Entiendo que los tiempos de procesamiento pueden variar según la demanda del momento, sin embargo, considero que la comunicación proactiva con el cliente es una parte fundamental de un buen servicio y esperaba haber recibido al menos una actualización automática por correo electrónico.</span></span><span style=\"margin:0px;padding:0px;font-size:12pt;line-height:20.7px;font-family:&quot;Times New Roman&quot;,&quot;Times New Roman_EmbeddedFont&quot;,&quot;Times New Roman_MSFontService&quot;,serif\"> </span></p></div><div style=\"margin:0px;padding:0px;clear:both;overflow:visible;direction:ltr;color:rgb(0,0,0);font-family:&quot;Segoe UI&quot;,&quot;Segoe UI Web&quot;,Arial,Verdana,sans-serif;font-size:12px\"><p style=\"margin:0px;padding:0px;vertical-align:baseline;font-kerning:none;background-color:transparent;color:windowtext\"><span lang=\"ES-CO\" style=\"margin:0px;padding:0px;font-size:12pt;line-height:20.7px;font-family:&quot;Times New Roman&quot;,&quot;Times New Roman_EmbeddedFont&quot;,&quot;Times New Roman_MSFontService&quot;,serif;font-variant-ligatures:none\"><span style=\"margin:0px;padding:0px\"> </span></span><span style=\"margin:0px;padding:0px;font-size:12pt;line-height:20.7px;font-family:&quot;Times New Roman&quot;,&quot;Times New Roman_EmbeddedFont&quot;,&quot;Times New Roman_MSFontService&quot;,serif\"> </span></p></div><div style=\"margin:0px;padding:0px;clear:both;overflow:visible;direction:ltr;color:rgb(0,0,0);font-family:&quot;Segoe UI&quot;,&quot;Segoe UI Web&quot;,Arial,Verdana,sans-serif;font-size:12px\"><p style=\"margin:0px;padding:0px;vertical-align:baseline;font-kerning:none;background-color:transparent;color:windowtext\"><span lang=\"ES-CO\" style=\"margin:0px;padding:0px;font-size:12pt;line-height:20.7px;font-family:&quot;Times New Roman&quot;,&quot;Times New Roman_EmbeddedFont&quot;,&quot;Times New Roman_MSFontService&quot;,serif;font-variant-ligatures:none\"><span style=\"margin:0px;padding:0px\">En segundo lugar, quisiera consultar sobre las condiciones actuales del servicio contratado. Cuando realicé la contratación, me fueron indicadas unas condiciones específicas relacionadas con los tiempos de entrega, las garantías aplicables y los canales de soporte disponibles. Sin embargo, al revisar la documentación que me fue entregada en ese momento, encuentro algunas ambigüedades que me gustaría que fueran aclaradas por un representante autorizado de la empresa.</span></span><span style=\"margin:0px;padding:0px;font-size:12pt;line-height:20.7px;font-family:&quot;Times New Roman&quot;,&quot;Times New Roman_EmbeddedFont&quot;,&quot;Times New Roman_MSFontService&quot;,serif\"> </span></p></div><div style=\"margin:0px;padding:0px;clear:both;overflow:visible;direction:ltr;color:rgb(0,0,0);font-family:&quot;Segoe UI&quot;,&quot;Segoe UI Web&quot;,Arial,Verdana,sans-serif;font-size:12px\"><p style=\"margin:0px;padding:0px;vertical-align:baseline;font-kerning:none;background-color:transparent;color:windowtext\"><span lang=\"ES-CO\" style=\"margin:0px;padding:0px;font-size:12pt;line-height:20.7px;font-family:&quot;Times New Roman&quot;,&quot;Times New Roman_EmbeddedFont&quot;,&quot;Times New Roman_MSFontService&quot;,serif;font-variant-ligatures:none\"><span style=\"margin:0px;padding:0px\"> </span></span><span style=\"margin:0px;padding:0px;font-size:12pt;line-height:20.7px;font-family:&quot;Times New Roman&quot;,&quot;Times New Roman_EmbeddedFont&quot;,&quot;Times New Roman_MSFontService&quot;,serif\"> </span></p></div><div style=\"margin:0px;padding:0px;clear:both;overflow:visible;direction:ltr;color:rgb(0,0,0);font-family:&quot;Segoe UI&quot;,&quot;Segoe UI Web&quot;,Arial,Verdana,sans-serif;font-size:12px\"><p style=\"margin:0px;padding:0px;vertical-align:baseline;font-kerning:none;background-color:transparent;color:windowtext\"><span lang=\"ES-CO\" style=\"margin:0px;padding:0px;font-size:12pt;line-height:20.7px;font-family:&quot;Times New Roman&quot;,&quot;Times New Roman_EmbeddedFont&quot;,&quot;Times New Roman_MSFontService&quot;,serif;font-variant-ligatures:none\"><span style=\"margin:0px;padding:0px\">En tercer lugar, me interesa saber si existen actualizaciones recientes en las políticas del servicio que puedan afectar mi contrato vigente. He leído en foros de usuarios que la empresa realizó cambios en sus condiciones generales durante el último trimestre, y quisiera confirmar si dichos cambios aplican a contratos previos como el mío, o únicamente a nuevas contrataciones realizadas a partir de esa fecha.</span></span><span style=\"margin:0px;padding:0px;font-size:12pt;line-height:20.7px;font-family:&quot;Times New Roman&quot;,&quot;Times New Roman_EmbeddedFont&quot;,&quot;Times New Roman_MSFontService&quot;,serif\"> </span></p></div><div style=\"margin:0px;padding:0px;clear:both;overflow:visible;direction:ltr;color:rgb(0,0,0);font-family:&quot;Segoe UI&quot;,&quot;Segoe UI Web&quot;,Arial,Verdana,sans-serif;font-size:12px\"><p style=\"margin:0px;padding:0px;vertical-align:baseline;font-kerning:none;background-color:transparent;color:windowtext\"><span lang=\"ES-CO\" style=\"margin:0px;padding:0px;font-size:12pt;line-height:20.7px;font-family:&quot;Times New Roman&quot;,&quot;Times New Roman_EmbeddedFont&quot;,&quot;Times New Roman_MSFontService&quot;,serif;font-variant-ligatures:none\"><span style=\"margin:0px;padding:0px\"> </span></span><span style=\"margin:0px;padding:0px;font-size:12pt;line-height:20.7px;font-family:&quot;Times New Roman&quot;,&quot;Times New Roman_EmbeddedFont&quot;,&quot;Times New Roman_MSFontService&quot;,serif\"> </span></p></div><div style=\"margin:0px;padding:0px;clear:both;overflow:visible;direction:ltr;color:rgb(0,0,0);font-family:&quot;Segoe UI&quot;,&quot;Segoe UI Web&quot;,Arial,Verdana,sans-serif;font-size:12px\"><p style=\"margin:0px;padding:0px;vertical-align:baseline;font-kerning:none;background-color:transparent;color:windowtext\"><span lang=\"ES-CO\" style=\"margin:0px;padding:0px;font-size:12pt;line-height:20.7px;font-family:&quot;Times New Roman&quot;,&quot;Times New Roman_EmbeddedFont&quot;,&quot;Times New Roman_MSFontService&quot;,serif;font-variant-ligatures:none\"><span style=\"margin:0px;padding:0px\">Además, quisiera aprovechar este mensaje para comentar sobre mi experiencia general con el servicio durante el tiempo que llevo como cliente. En términos generales ha sido satisfactoria, aunque en algunos momentos he encontrado dificultades para comunicarme con el área de soporte de manera ágil. Los tiempos de espera en la línea telefónica son bastante prolongados, y en ocasiones la opción de chat en línea aparece como no disponible sin previo aviso, lo cual dificulta la resolución rápida de inquietudes.</span></span><span style=\"margin:0px;padding:0px;font-size:12pt;line-height:20.7px;font-family:&quot;Times New Roman&quot;,&quot;Times New Roman_EmbeddedFont&quot;,&quot;Times New Roman_MSFontService&quot;,serif\"> </span></p></div><div style=\"margin:0px;padding:0px;clear:both;overflow:visible;direction:ltr;color:rgb(0,0,0);font-family:&quot;Segoe UI&quot;,&quot;Segoe UI Web&quot;,Arial,Verdana,sans-serif;font-size:12px\"><p style=\"margin:0px;padding:0px;vertical-align:baseline;font-kerning:none;background-color:transparent;color:windowtext\"><span lang=\"ES-CO\" style=\"margin:0px;padding:0px;font-size:12pt;line-height:20.7px;font-family:&quot;Times New Roman&quot;,&quot;Times New Roman_EmbeddedFont&quot;,&quot;Times New Roman_MSFontService&quot;,serif;font-variant-ligatures:none\"><span style=\"margin:0px;padding:0px\"> </span></span><span style=\"margin:0px;padding:0px;font-size:12pt;line-height:20.7px;font-family:&quot;Times New Roman&quot;,&quot;Times New Roman_EmbeddedFont&quot;,&quot;Times New Roman_MSFontService&quot;,serif\"> </span></p></div><div style=\"margin:0px;padding:0px;clear:both;overflow:visible;direction:ltr;color:rgb(0,0,0);font-family:&quot;Segoe UI&quot;,&quot;Segoe UI Web&quot;,Arial,Verdana,sans-serif;font-size:12px\"><p style=\"margin:0px;padding:0px;vertical-align:baseline;font-kerning:none;background-color:transparent;color:windowtext\"><span lang=\"ES-CO\" style=\"margin:0px;padding:0px;font-size:12pt;line-height:20.7px;font-family:&quot;Times New Roman&quot;,&quot;Times New Roman_EmbeddedFont&quot;,&quot;Times New Roman_MSFontService&quot;,serif;font-variant-ligatures:none\"><span style=\"margin:0px;padding:0px\">También quisiera preguntar si existe algún programa de fidelización o beneficios para clientes con más de un año de antigüedad. Llevo ya catorce meses como cliente activo y me gustaría saber si eso me da acceso a algún tipo de ventaja comercial, descuento en la renovación del contrato o acceso prioritario a los canales de soporte técnico y atención personalizada.</span></span><span style=\"margin:0px;padding:0px;font-size:12pt;line-height:20.7px;font-family:&quot;Times New Roman&quot;,&quot;Times New Roman_EmbeddedFont&quot;,&quot;Times New Roman_MSFontService&quot;,serif\"> </span></p></div><div style=\"margin:0px;padding:0px;clear:both;overflow:visible;direction:ltr;color:rgb(0,0,0);font-family:&quot;Segoe UI&quot;,&quot;Segoe UI Web&quot;,Arial,Verdana,sans-serif;font-size:12px\"><p style=\"margin:0px;padding:0px;vertical-align:baseline;font-kerning:none;background-color:transparent;color:windowtext\"><span lang=\"ES-CO\" style=\"margin:0px;padding:0px;font-size:12pt;line-height:20.7px;font-family:&quot;Times New Roman&quot;,&quot;Times New Roman_EmbeddedFont&quot;,&quot;Times New Roman_MSFontService&quot;,serif;font-variant-ligatures:none\"><span style=\"margin:0px;padding:0px\"> </span></span><span style=\"margin:0px;padding:0px;font-size:12pt;line-height:20.7px;font-family:&quot;Times New Roman&quot;,&quot;Times New Roman_EmbeddedFont&quot;,&quot;Times New Roman_MSFontService&quot;,serif\"> </span></p></div><div style=\"margin:0px;padding:0px;clear:both;overflow:visible;direction:ltr;color:rgb(0,0,0);font-family:&quot;Segoe UI&quot;,&quot;Segoe UI Web&quot;,Arial,Verdana,sans-serif;font-size:12px\"><p style=\"margin:0px;padding:0px;vertical-align:baseline;font-kerning:none;background-color:transparent;color:windowtext\"><span lang=\"ES-CO\" style=\"margin:0px;padding:0px;font-size:12pt;line-height:20.7px;font-family:&quot;Times New Roman&quot;,&quot;Times New Roman_EmbeddedFont&quot;,&quot;Times New Roman_MSFontService&quot;,serif;font-variant-ligatures:none\"><span style=\"margin:0px;padding:0px\">Otro punto que me gustaría tratar es el relacionado con la facturación. En los últimos dos meses he notado una pequeña discrepancia entre el monto facturado y el que aparece en mi historial de pagos dentro de la plataforma. No es una diferencia significativa, pero considero importante que sea revisada y aclarada formalmente para evitar inconvenientes futuros y mantener la transparencia en la relación comercial.</span></span><span style=\"margin:0px;padding:0px;font-size:12pt;line-height:20.7px;font-family:&quot;Times New Roman&quot;,&quot;Times New Roman_EmbeddedFont&quot;,&quot;Times New Roman_MSFontService&quot;,serif\"> </span></p></div><div style=\"margin:0px;padding:0px;clear:both;overflow:visible;direction:ltr;color:rgb(0,0,0);font-family:&quot;Segoe UI&quot;,&quot;Segoe UI Web&quot;,Arial,Verdana,sans-serif;font-size:12px\"><p style=\"margin:0px;padding:0px;vertical-align:baseline;font-kerning:none;background-color:transparent;color:windowtext\"><span lang=\"ES-CO\" style=\"margin:0px;padding:0px;font-size:12pt;line-height:20.7px;font-family:&quot;Times New Roman&quot;,&quot;Times New Roman_EmbeddedFont&quot;,&quot;Times New Roman_MSFontService&quot;,serif;font-variant-ligatures:none\"><span style=\"margin:0px;padding:0px\"> </span></span><span style=\"margin:0px;padding:0px;font-size:12pt;line-height:20.7px;font-family:&quot;Times New Roman&quot;,&quot;Times New Roman_EmbeddedFont&quot;,&quot;Times New Roman_MSFontService&quot;,serif\"> </span></p></div><div style=\"margin:0px;padding:0px;clear:both;overflow:visible;direction:ltr;color:rgb(0,0,0);font-family:&quot;Segoe UI&quot;,&quot;Segoe UI Web&quot;,Arial,Verdana,sans-serif;font-size:12px\"><p style=\"margin:0px;padding:0px;vertical-align:baseline;font-kerning:none;background-color:transparent;color:windowtext\"><span lang=\"ES-CO\" style=\"margin:0px;padding:0px;font-size:12pt;line-height:20.7px;font-family:&quot;Times New Roman&quot;,&quot;Times New Roman_EmbeddedFont&quot;,&quot;Times New Roman_MSFontService&quot;,serif;font-variant-ligatures:none\"><span style=\"margin:0px;padding:0px\">Asimismo, me gustaría conocer cuál es el procedimiento formal para presentar una solicitud de revisión de contrato. Si en algún momento decido modificar alguno de los términos acordados inicialmente, ¿cuál es el canal adecuado para hacerlo? ¿Existe un formulario específico o se gestiona directamente a través del área comercial?</span></span><span style=\"margin:0px;padding:0px;font-size:12pt;line-height:20.7px;font-family:&quot;Times New Roman&quot;,&quot;Times New Roman_EmbeddedFont&quot;,&quot;Times New Roman_MSFontService&quot;,serif\"> </span></p></div><div style=\"margin:0px;padding:0px;clear:both;overflow:visible;direction:ltr;color:rgb(0,0,0);font-family:&quot;Segoe UI&quot;,&quot;Segoe UI Web&quot;,Arial,Verdana,sans-serif;font-size:12px\"><p style=\"margin:0px;padding:0px;vertical-align:baseline;font-kerning:none;background-color:transparent;color:windowtext\"><span lang=\"ES-CO\" style=\"margin:0px;padding:0px;font-size:12pt;line-height:20.7px;font-family:&quot;Times New Roman&quot;,&quot;Times New Roman_EmbeddedFont&quot;,&quot;Times New Roman_MSFontService&quot;,serif;font-variant-ligatures:none\"><span style=\"margin:0px;padding:0px\"> </span></span><span style=\"margin:0px;padding:0px;font-size:12pt;line-height:20.7px;font-family:&quot;Times New Roman&quot;,&quot;Times New Roman_EmbeddedFont&quot;,&quot;Times New Roman_MSFontService&quot;,serif\"> </span></p></div><div style=\"margin:0px;padding:0px;clear:both;overflow:visible;direction:ltr;color:rgb(0,0,0);font-family:&quot;Segoe UI&quot;,&quot;Segoe UI Web&quot;,Arial,Verdana,sans-serif;font-size:12px\"><p style=\"margin:0px;padding:0px;vertical-align:baseline;font-kerning:none;background-color:transparent;color:windowtext\"><span lang=\"ES-CO\" style=\"margin:0px;padding:0px;font-size:12pt;line-height:20.7px;font-family:&quot;Times New Roman&quot;,&quot;Times New Roman_EmbeddedFont&quot;,&quot;Times New Roman_MSFontService&quot;,serif;font-variant-ligatures:none\"><span style=\"margin:0px;padding:0px\">Por último, quisiera solicitar que me sea enviado un resumen completo del historial de mi cuenta, incluyendo todas las transacciones realizadas, los servicios activos, las fechas de renovación y cualquier nota relevante que exista en mi expediente de cliente. Esto me ayudaría a tener una visión más clara de mi situación actual y facilitaría cualquier gestión futura que necesite realizar.</span></span><span style=\"margin:0px;padding:0px;font-size:12pt;line-height:20.7px;font-family:&quot;Times New Roman&quot;,&quot;Times New Roman_EmbeddedFont&quot;,&quot;Times New Roman_MSFontService&quot;,serif\"> </span></p></div><div style=\"margin:0px;padding:0px;clear:both;overflow:visible;direction:ltr;color:rgb(0,0,0);font-family:&quot;Segoe UI&quot;,&quot;Segoe UI Web&quot;,Arial,Verdana,sans-serif;font-size:12px\"><p style=\"margin:0px;padding:0px;vertical-align:baseline;font-kerning:none;background-color:transparent;color:windowtext\"><span lang=\"ES-CO\" style=\"margin:0px;padding:0px;font-size:12pt;line-height:20.7px;font-family:&quot;Times New Roman&quot;,&quot;Times New Roman_EmbeddedFont&quot;,&quot;Times New Roman_MSFontService&quot;,serif;font-variant-ligatures:none\"><span style=\"margin:0px;padding:0px\"> </span></span><span style=\"margin:0px;padding:0px;font-size:12pt;line-height:20.7px;font-family:&quot;Times New Roman&quot;,&quot;Times New Roman_EmbeddedFont&quot;,&quot;Times New Roman_MSFontService&quot;,serif\"> </span></p></div><div style=\"margin:0px;padding:0px;clear:both;overflow:visible;direction:ltr;color:rgb(0,0,0);font-family:&quot;Segoe UI&quot;,&quot;Segoe UI Web&quot;,Arial,Verdana,sans-serif;font-size:12px\"><p style=\"margin:0px;padding:0px;vertical-align:baseline;font-kerning:none;background-color:transparent;color:windowtext\"><span lang=\"ES-CO\" style=\"margin:0px;padding:0px;font-size:12pt;line-height:20.7px;font-family:&quot;Times New Roman&quot;,&quot;Times New Roman_EmbeddedFont&quot;,&quot;Times New Roman_MSFontService&quot;,serif;font-variant-ligatures:none\"><span style=\"margin:0px;padding:0px\">Agradezco de antemano la atención prestada a este mensaje y quedo a la espera de una respuesta completa y detallada a cada uno de los puntos planteados anteriormente.</span></span><span style=\"margin:0px;padding:0px;font-size:12pt;line-height:20.7px;font-family:&quot;Times New Roman&quot;,&quot;Times New Roman_EmbeddedFont&quot;,&quot;Times New Roman_MSFontService&quot;,serif\"> </span></p></div></div>\n\n<br>\n<div style=\"text-align:justify\">Este mensaje (incluyendo cualquier anexo) contiene información confidencial y se encuentra protegido por la ley. sólo puede ser utilizada por la persona o compañía a la cual está dirigido. si usted no es el receptor autorizado, o por error recibe este mensaje, favor borrarlo inmediatamente. cualquier retención, difusión, distribución, copia o toma de cualquier acción basada en ella, se encuentra estrictamente prohibido. </div><div style=\"text-align:justify\">This message (including any attachments) contains confidential information intended for a specific individual and purpose, and is protected by the law. if you are not the intended recipient, you should delete this message. any disclosure, copying, distribution of this message, or taking any action based on it, is strictly prohibited.<br></div>",
+          "text": "Estimado equipo de atención al cliente,\n\n\n\nMe dirijo a ustedes con el fin de realizar una consulta detallada respecto\nal estado actual de mi pedido y algunas condiciones del servicio que\nconsidero importantes aclarar antes de tomar cualquier decisión al respecto.\n\n\n\n\nEn primer lugar, quisiera mencionar que realicé mi pedido hace\naproximadamente tres semanas. Desde entonces no he recibido ninguna\nnotificación formal sobre el avance del mismo, lo cual me genera cierta\ninquietud. Entiendo que los tiempos de procesamiento pueden variar según la\ndemanda del momento, sin embargo, considero que la comunicación proactiva\ncon el cliente es una parte fundamental de un buen servicio y esperaba\nhaber recibido al menos una actualización automática por correo electrónico.\n\n\n\n\nEn segundo lugar, quisiera consultar sobre las condiciones actuales del\nservicio contratado. Cuando realicé la contratación, me fueron indicadas\nunas condiciones específicas relacionadas con los tiempos de entrega, las\ngarantías aplicables y los canales de soporte disponibles. Sin embargo, al\nrevisar la documentación que me fue entregada en ese momento, encuentro\nalgunas ambigüedades que me gustaría que fueran aclaradas por un\nrepresentante autorizado de la empresa.\n\n\n\nEn tercer lugar, me interesa saber si existen actualizaciones recientes en\nlas políticas del servicio que puedan afectar mi contrato vigente. He leído\nen foros de usuarios que la empresa realizó cambios en sus condiciones\ngenerales durante el último trimestre, y quisiera confirmar si dichos\ncambios aplican a contratos previos como el mío, o únicamente a nuevas\ncontrataciones realizadas a partir de esa fecha.\n\n\n\nAdemás, quisiera aprovechar este mensaje para comentar sobre mi experiencia\ngeneral con el servicio durante el tiempo que llevo como cliente. En\ntérminos generales ha sido satisfactoria, aunque en algunos momentos he\nencontrado dificultades para comunicarme con el área de soporte de manera\nágil. Los tiempos de espera en la línea telefónica son bastante\nprolongados, y en ocasiones la opción de chat en línea aparece como no\ndisponible sin previo aviso, lo cual dificulta la resolución rápida de\ninquietudes.\n\n\n\nTambién quisiera preguntar si existe algún programa de fidelización o\nbeneficios para clientes con más de un año de antigüedad. Llevo ya catorce\nmeses como cliente activo y me gustaría saber si eso me da acceso a algún\ntipo de ventaja comercial, descuento en la renovación del contrato o acceso\nprioritario a los canales de soporte técnico y atención personalizada.\n\n\n\nOtro punto que me gustaría tratar es el relacionado con la facturación. En\nlos últimos dos meses he notado una pequeña discrepancia entre el monto\nfacturado y el que aparece en mi historial de pagos dentro de la\nplataforma. No es una diferencia significativa, pero considero importante\nque sea revisada y aclarada formalmente para evitar inconvenientes futuros\ny mantener la transparencia en la relación comercial.\n\n\n\nAsimismo, me gustaría conocer cuál es el procedimiento formal para\npresentar una solicitud de revisión de contrato. Si en algún momento decido\nmodificar alguno de los términos acordados inicialmente, ¿cuál es el canal\nadecuado para hacerlo? ¿Existe un formulario específico o se gestiona\ndirectamente a través del área comercial?\n\n\n\nPor último, quisiera solicitar que me sea enviado un resumen completo del\nhistorial de mi cuenta, incluyendo todas las transacciones realizadas, los\nservicios activos, las fechas de renovación y cualquier nota relevante que\nexista en mi expediente de cliente. Esto me ayudaría a tener una visión más\nclara de mi situación actual y facilitaría cualquier gestión futura que\nnecesite realizar.\n\n\n\nAgradezco de antemano la atención prestada a este mensaje y quedo a la\nespera de una respuesta completa y detallada a cada uno de los puntos\nplanteados anteriormente.\n\n-- \nEste mensaje (incluyendo cualquier anexo) contiene información confidencial \ny se encuentra protegido por la ley. sólo puede ser utilizada por la \npersona o compañía a la cual está dirigido. si usted no es el receptor \nautorizado, o por error recibe este mensaje, favor borrarlo inmediatamente. \ncualquier retención, difusión, distribución, copia o toma de cualquier \nacción basada en ella, se encuentra estrictamente prohibido. \nThis message \n(including any attachments) contains confidential information intended for \na specific individual and purpose, and is protected by the law. if you are \nnot the intended recipient, you should delete this message. any disclosure, \ncopying, distribution of this message, or taking any action based on it, is \nstrictly prohibited.\n\n",
+          "textAsHtml": "<p>Estimado equipo de atenci&oacute;n al cliente,</p><p>Me dirijo a ustedes con el fin de realizar una consulta detallada respecto<br/>al estado actual de mi pedido y algunas condiciones del servicio que<br/>considero importantes aclarar antes de tomar cualquier decisi&oacute;n al respecto.</p><p>En primer lugar, quisiera mencionar que realic&eacute; mi pedido hace<br/>aproximadamente tres semanas. Desde entonces no he recibido ninguna<br/>notificaci&oacute;n formal sobre el avance del mismo, lo cual me genera cierta<br/>inquietud. Entiendo que los tiempos de procesamiento pueden variar seg&uacute;n la<br/>demanda del momento, sin embargo, considero que la comunicaci&oacute;n proactiva<br/>con el cliente es una parte fundamental de un buen servicio y esperaba<br/>haber recibido al menos una actualizaci&oacute;n autom&aacute;tica por correo electr&oacute;nico.</p><p>En segundo lugar, quisiera consultar sobre las condiciones actuales del<br/>servicio contratado. Cuando realic&eacute; la contrataci&oacute;n, me fueron indicadas<br/>unas condiciones espec&iacute;ficas relacionadas con los tiempos de entrega, las<br/>garant&iacute;as aplicables y los canales de soporte disponibles. Sin embargo, al<br/>revisar la documentaci&oacute;n que me fue entregada en ese momento, encuentro<br/>algunas ambig&uuml;edades que me gustar&iacute;a que fueran aclaradas por un<br/>representante autorizado de la empresa.</p><p>En tercer lugar, me interesa saber si existen actualizaciones recientes en<br/>las pol&iacute;ticas del servicio que puedan afectar mi contrato vigente. He le&iacute;do<br/>en foros de usuarios que la empresa realiz&oacute; cambios en sus condiciones<br/>generales durante el &uacute;ltimo trimestre, y quisiera confirmar si dichos<br/>cambios aplican a contratos previos como el m&iacute;o, o &uacute;nicamente a nuevas<br/>contrataciones realizadas a partir de esa fecha.</p><p>Adem&aacute;s, quisiera aprovechar este mensaje para comentar sobre mi experiencia<br/>general con el servicio durante el tiempo que llevo como cliente. En<br/>t&eacute;rminos generales ha sido satisfactoria, aunque en algunos momentos he<br/>encontrado dificultades para comunicarme con el &aacute;rea de soporte de manera<br/>&aacute;gil. Los tiempos de espera en la l&iacute;nea telef&oacute;nica son bastante<br/>prolongados, y en ocasiones la opci&oacute;n de chat en l&iacute;nea aparece como no<br/>disponible sin previo aviso, lo cual dificulta la resoluci&oacute;n r&aacute;pida de<br/>inquietudes.</p><p>Tambi&eacute;n quisiera preguntar si existe alg&uacute;n programa de fidelizaci&oacute;n o<br/>beneficios para clientes con m&aacute;s de un a&ntilde;o de antig&uuml;edad. Llevo ya catorce<br/>meses como cliente activo y me gustar&iacute;a saber si eso me da acceso a alg&uacute;n<br/>tipo de ventaja comercial, descuento en la renovaci&oacute;n del contrato o acceso<br/>prioritario a los canales de soporte t&eacute;cnico y atenci&oacute;n personalizada.</p><p>Otro punto que me gustar&iacute;a tratar es el relacionado con la facturaci&oacute;n. En<br/>los &uacute;ltimos dos meses he notado una peque&ntilde;a discrepancia entre el monto<br/>facturado y el que aparece en mi historial de pagos dentro de la<br/>plataforma. No es una diferencia significativa, pero considero importante<br/>que sea revisada y aclarada formalmente para evitar inconvenientes futuros<br/>y mantener la transparencia en la relaci&oacute;n comercial.</p><p>Asimismo, me gustar&iacute;a conocer cu&aacute;l es el procedimiento formal para<br/>presentar una solicitud de revisi&oacute;n de contrato. Si en alg&uacute;n momento decido<br/>modificar alguno de los t&eacute;rminos acordados inicialmente, &iquest;cu&aacute;l es el canal<br/>adecuado para hacerlo? &iquest;Existe un formulario espec&iacute;fico o se gestiona<br/>directamente a trav&eacute;s del &aacute;rea comercial?</p><p>Por &uacute;ltimo, quisiera solicitar que me sea enviado un resumen completo del<br/>historial de mi cuenta, incluyendo todas las transacciones realizadas, los<br/>servicios activos, las fechas de renovaci&oacute;n y cualquier nota relevante que<br/>exista en mi expediente de cliente. Esto me ayudar&iacute;a a tener una visi&oacute;n m&aacute;s<br/>clara de mi situaci&oacute;n actual y facilitar&iacute;a cualquier gesti&oacute;n futura que<br/>necesite realizar.</p><p>Agradezco de antemano la atenci&oacute;n prestada a este mensaje y quedo a la<br/>espera de una respuesta completa y detallada a cada uno de los puntos<br/>planteados anteriormente.</p><p>--<br/>Este mensaje (incluyendo cualquier anexo) contiene informaci&oacute;n confidencial<br/>y se encuentra protegido por la ley. s&oacute;lo puede ser utilizada por la<br/>persona o compa&ntilde;&iacute;a a la cual est&aacute; dirigido. si usted no es el receptor<br/>autorizado, o por error recibe este mensaje, favor borrarlo inmediatamente.<br/>cualquier retenci&oacute;n, difusi&oacute;n, distribuci&oacute;n, copia o toma de cualquier<br/>acci&oacute;n basada en ella, se encuentra estrictamente prohibido.&nbsp;<br/>This message<br/>(including any attachments) contains confidential information intended for<br/>a specific individual and purpose, and is protected by the law. if you are<br/>not the intended recipient, you should delete this message. any disclosure,<br/>copying, distribution of this message, or taking any action based on it, is<br/>strictly prohibited.</p>",
+          "subject": "Consulta detallada sobre estado de mi pedido y condiciones del servicio",
+          "date": "2026-03-24T05:55:57.000Z",
+          "to": {
+            "value": [
+              {
+                "address": "tito1999.2009@gmail.com",
+                "name": ""
+              }
+            ],
+            "html": "<span class=\"mp_address_group\"><a href=\"mailto:tito1999.2009@gmail.com\" class=\"mp_address_email\">tito1999.2009@gmail.com</a></span>",
+            "text": "tito1999.2009@gmail.com"
+          },
+          "from": {
+            "value": [
+              {
+                "address": "carlos.olaya@cecar.edu.co",
+                "name": "CARLOS ENRIQUE OLAYA HERNANDEZ"
+              }
+            ],
+            "html": "<span class=\"mp_address_group\"><span class=\"mp_address_name\">CARLOS ENRIQUE OLAYA HERNANDEZ</span> &lt;<a href=\"mailto:carlos.olaya@cecar.edu.co\" class=\"mp_address_email\">carlos.olaya@cecar.edu.co</a>&gt;</span>",
+            "text": "\"CARLOS ENRIQUE OLAYA HERNANDEZ\" <carlos.olaya@cecar.edu.co>"
+          },
+          "messageId": "<CA+=4OM7B2-KOCUheZmc=ORXSPveQ06UfjZ6eybL7zjptcPJ4yw@mail.gmail.com>"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Convertir variables de interes": {
+      "main": [
+        [
+          {
+            "node": "Analizar el contenido del mensaje",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Crear ticket en BD (Estado: Recibido)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger correo del cliente": {
+      "main": [
+        [
+          {
+            "node": "Marcar como leído",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resultado limpio y directo": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Analizar el contenido del mensaje",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analizar el contenido del mensaje": {
+      "main": [
+        [
+          {
+            "node": "¿IA respondió correctamente?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Espera y une": {
+      "main": [
+        [
+          {
+            "node": "Agrupar datos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agrupar datos": {
+      "main": [
+        [
+          {
+            "node": "Actualizar análisis IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar confirmación de recepción": {
+      "main": [
+        [
+          {
+            "node": "Espera y une",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Crear ticket en BD (Estado: Recibido)": {
+      "main": [
+        [
+          {
+            "node": "Enviar confirmación de recepción",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Actualizar análisis IA": {
+      "main": [
+        [
+          {
+            "node": "Verificar tickets repetidos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Requiere escalamiento?": {
+      "main": [
+        [
+          {
+            "node": "Enviar escalado humano",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Historial: Resuelto automáticamente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Departamento de Atención o Jurídica?": {
+      "main": [
+        [
+          {
+            "node": "Historial: Escalado Atención a usuario",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Historial: Escalado Asesoria juridica",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Historial: Escalado Atención a usuario": {
+      "main": [
+        [
+          {
+            "node": "Reenviar a Atención al Usuario",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Historial: Escalado Asesoria juridica": {
+      "main": [
+        [
+          {
+            "node": "Reenviar a Asesoria juridica",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Historial: Resuelto automáticamente": {
+      "main": [
+        [
+          {
+            "node": "Notificar resuelto automatico al cliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar escalado humano": {
+      "main": [
+        [
+          {
+            "node": "¿Departamento de Atención o Jurídica?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger respuesta asesoria juridica": {
+      "main": [
+        [
+          {
+            "node": "Marcar como leído asesoria juridica",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger respuesta atencion usuario": {
+      "main": [
+        [
+          {
+            "node": "Marcar como leído atencion cliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Obtener ticket original": {
+      "main": [
+        [
+          {
+            "node": "Historial: Cerrado por humano",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Historial: Cerrado por humano": {
+      "main": [
+        [
+          {
+            "node": "Notificar cierre humano al cliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar como leído": {
+      "main": [
+        [
+          {
+            "node": "Evitar Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evitar Loop": {
+      "main": [
+        [
+          {
+            "node": "Convertir variables de interes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar como leído asesoria juridica": {
+      "main": [
+        [
+          {
+            "node": "Extraer datos de asesoria juridica",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar como leído atencion cliente": {
+      "main": [
+        [
+          {
+            "node": "Extraer datos de atencion al usuario",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Es respuesta validad?": {
+      "main": [
+        [
+          {
+            "node": "Obtener ticket original",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Extraer datos de atencion al usuario": {
+      "main": [
+        [
+          {
+            "node": "¿Es respuesta validad?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraer datos de asesoria juridica": {
+      "main": [
+        [
+          {
+            "node": "¿Es respuesta validad?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Analizar el contenido del mensaje",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿IA respondió correctamente?": {
+      "main": [
+        [
+          {
+            "node": "Espera y une",
+            "type": "main",
+            "index": 1
+          }
+        ],
+        [
+          {
+            "node": "Notificación si IA falla",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar tickets repetidos": {
+      "main": [
+        [
+          {
+            "node": "¿Requiere escalamiento?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "235b4fa3-b225-45cc-a217-5ac4b8a21403",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7b5e15642fc6df8fea8e9e9c2a94862c2fd3c80d9dd1d13174882035ce3d598a"
+  },
+  "id": "OEbMwSokDYMn0FWl",
+  "tags": []
+}
