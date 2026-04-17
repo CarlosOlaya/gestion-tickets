@@ -60,6 +60,10 @@ gestion-tickets/
 
 ## 🚀 Instalación
 
+## 🎥 Guía de Instalación
+
+[🔗 Ver video en Google Drive](https://drive.google.com/file/d/1CXq72zZRF7P5uw6pPOS5PMh2O5TFM1HE/view?usp=sharing)
+
 ### Paso 1 — Instalar Docker en la VPS
 
 ```bash
